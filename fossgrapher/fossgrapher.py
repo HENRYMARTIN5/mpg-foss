@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from betterlib.logging import Logger
+import matplotlib.ticker as ticker
 import threading
 import mplcursors
 
@@ -81,6 +82,11 @@ else:
     plt.title('Raw Data')
 if not args.no_fourier:
     plt.ylim(0, 30)
+# Set up custom X-axis tick formatter
+def x_formatter(x, pos):
+    """Custom formatter to divide x-axis values by 10"""
+    return f'{x/10:.1f}'
+plt.gca().xaxis.set_major_formatter(ticker.FuncFormatter(x_formatter))
 plt.savefig(args.output[0])
 logger.info("Graph saved, showing figure...")
 thread = threading.Thread(target=plotJumperThread, args=(plt,))
