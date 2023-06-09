@@ -3,3 +3,9 @@ numpy
 betterlib
 mplcursors
 scipy
+pyusb
+pandas
+bitarray
+wheel
+halo
+GitPython
