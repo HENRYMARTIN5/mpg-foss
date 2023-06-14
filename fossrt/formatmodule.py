@@ -40,20 +40,6 @@ class prints:
                 if next(reversed(value.keys())) == k:
                     print()
 
-    def color_print(self, text, color = None):
-        match color:
-            case "info" | "magenta":
-                color = bcolors.HEADER
-            case "fail" | "red":
-                color = bcolors.FAIL
-            case "success" | "green":
-                color = bcolors.OKGREEN
-            case "cyan":
-                color = bcolors.OKCYAN
-            case _:
-                color = bcolors.HEADER
-        print(f"{bcolors.OKBLUE}{bsymbols.info}{color} {text}{bcolors.ENDC}")
-
     def init_spinner(self, c = None):
         try:
             from halo import Halo
