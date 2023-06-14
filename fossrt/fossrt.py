@@ -1,3 +1,12 @@
+"""
+Written by Caleb C. & Andrew Valentini in 2022 for Carthage Space Sciences | WSGC | NASA
+Butchered by Henry M. in 2023 for realtime viewing of data.
+Collects data from the Gator hardware (or simulator) and saves it to a CSV file.
+"""
+
+from halo import Halo
+from formatmodule import bcolors, bsymbols, prints, files
+from fosmodule import datahelper, gatorpacket, packetsim
 import pandas as pd
 import os
 import time
@@ -5,20 +14,95 @@ import usb.core
 import usb.util
 import sys
 import array
-from fosmodule import datahelper, gatorpacket, packetsim
-from formatmodule import prints
 import struct
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import threading
-import mplcursors
-from cog import cog_to_wavelength
+from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
+import matplotlib.animation as anim
+import numpy as np
+
+currentData = {
+    "sensor1": 0,
+    "sensor2": 0,
+    "sensor3": 0,
+    "sensor4": 0,
+    "sensor5": 0,
+    "sensor6": 0,
+    "sensor7": 0,
+    "sensor8": 0,
+}
+
+def cog_to_wavelength(binary):
+    return 1514+((int(binary, 2) * (1586-1514))/(2 ** 18)) # secret sauce
+
+def plotDataFrame(frames):
+    # set currentData
+    global currentData
+    try:
+        for frame in frames:
+            if frame is not None:
+                sensorNum = int(frame['sensor'].split('_')[1])
+                currentData['sensor' + str(sensorNum)] = cog_to_wavelength(frame['cog'])
+    except:
+        print("mpg-foss-rt: Error parsing data frame!")
+    print(currentData)
+
+def parserThread(packets):
+    try:
+        # kicked off every time data is recieved so the program can continue working even while data is being parsed
+        # prevents issues with sensor data not appearing correctly
+        for key in packets:
+            thispacket = gatorpacket()
+            thispacket.raw_data = packets[key]
+            #This tuple contains the inner class objects of the packet class.
+            pkt_header, pkt_status, pkt_cog = thispacket.create_inner()
+            #Pull out relevant values
+            pkt_num = pkt_header.get_packet_num()
+            pkt_timestamp = pkt_header.get_timestamp()
+            #pkt_payload_len = pkt_header.get_payload_len()
+            #gator_version = pkt_header.get_version()
+            #gator_type = pkt_header.get_gator_type()
+            cog_data = pkt_cog.get_cog_data()
+            ### Get user decision on handling data ###
+            selection_csv = True
+            save_to_csv = True
+            data_frames = []
+            #TODO: Save to CSV here!
+            #------------------------------------------------------------------------------------------------------------------------------------------#
+            if save_to_csv is True:
+                spinner.start()
+                cog = {}
+                err = {}
+                for key in cog_data.keys():
+                    cog[key] = cog_data[key]["cog"]
+                    err[key] = cog_data[key]["err"]
+                for key, value in cog_data.items():
+                    columns = {'packet':pkt_num,'timestamp':pkt_timestamp, 'sensor': key, 'cog': cog[key], 'err': err[key]}
+                    data_frames.append(columns)
+            #--------------------------------------------------------------------------------------------------------------------#
+        print("mpg-foss: Grabbed data frames!")
+        # take the json and pass it along to the next phase of processing
+        plotDataFrame(data_frames)            
+    except (KeyError, struct.error):
+        print("mpg-foss: Error parsing data!")
+
+#Initialize
+spinner = Halo(spinner='dots')
+errorStatus = False
+date = time.strftime("%Y-%m-%d")
+f = files()
+output_path = f.next_path(f"./data/out/{date}_run-%s.csv")
+num_packets = 1
+collectDuration = 0
+
+def error_check():
+    global errorStatus
+    global spinner
+    spinner.start()
 
 def detect_gator():
-    print("Searching for Gator...")
+    print(f"{bcolors.ENDC}{bsymbols.info} {bcolors.HEADER}mpg-foss: Searching for gator hardware...{bcolors.ENDC}")
     endpoint = None
-    time.sleep(0.65)
     # Find the Gator via vID & pID
     dev = usb.core.find(idVendor=0x0403, idProduct=0x6010)
     # Set endpoint if it was found
@@ -30,7 +114,7 @@ def detect_gator():
                 sys.exit("Could not detach kernel driver: ")
         try:
                 usb.util.claim_interface(dev, 0)
-                print(f"Claimed device...")
+                print(f"{bcolors.ENDC}{bsymbols.info} {bcolors.HEADER}mpg-foss: Claimed device...{bcolors.ENDC}")
         except:
                 endpoint = dev[0][(0,0)][0]
         cfg = dev.get_active_configuration()
@@ -46,106 +130,96 @@ def detect_gator():
     return dev, endpoint
 
 def main():
-    dev, endpoint = detect_gator()
-    if dev == None:
-        print("Failed to find Gator.")
-        sys.exit(1)
-    print(str(endpoint))
-    print("Beginning realtime collection...")
+    #Globals
+    global errorStatus
+    global spinner
+    global collectDuration
+    global num_packets
+    global output_path
 
-    packets = []
-    fullFrames = []
+    #Initialize
+    spinner.start()
+    threads = []
 
-    for i in range(1,3):
-        rxBytes = array.array('B', [0]) * (64 * 8)
-        rxBuffer = array.array('B')
-        collectDuration = 1
-        #Run a loop for the specified duration in seconds:
-        start_time = time.time()
-        while time.time() - start_time < collectDuration:
-            dev.read(endpoint.bEndpointAddress, rxBytes)
-            rxBuffer.extend(rxBytes)
-        dataBytes = bytearray(rxBuffer)
-        dataBytes.reverse() #May need to reverse or rewrite the datahelper
-        datum = datahelper()
-        datum.raw_data = dataBytes
-        packetchunk = datum.parse()
-        packets.append(packetchunk)
-        frames = []
-        for key in packetchunk:
-            frame = []
-            thispacket = gatorpacket()
-            thispacket.raw_data = packetchunk[key]
-            pkt_header, pkt_status, pkt_cog = thispacket.create_inner()
-            pkt_num = pkt_header.get_packet_num()
-            pkt_timestamp = pkt_header.get_timestamp()
-            cog_data = pkt_cog.get_cog_data()
-            cog = {}
-            err = {}
-            for key, value in cog_data.items():
-                for k, v in value.items():
-                    if k == "cog":
-                        cog[key] = v
-                    elif k == "err":
-                        err[key] = v
-            for key, value in cog_data.items():
-                columns = {'packet':pkt_num,'timestamp':pkt_timestamp, 'sensor': key, 'cog': cog[key], 'err': err[key]}
-                frame.append(columns)
-            frames.append(frame)
-        # print(frames)
-        fullFrames.append(frames)
-        # TODO: realtime plot
-    # assemble data
-    sensorFrames = []
-    mergeme = []
-    for frames in fullFrames:
-        for _frame in frames:
-            for frame in _frame:
-                sensorVals = {
-                    "1": [],
-                    "2": [],
-                    "3": [],
-                    "4": [],
-                    "5": [],
-                    "6": [],
-                    "7": [],
-                    "8": []
-                }
-                sensorNum = str(int(frame['sensor'].split("_")[1])) # convert back and forth to remove prefixed 0
-                sensorVals[sensorNum].append(cog_to_wavelength(frame['cog']))
-                sensorFrames.append(sensorVals)
-            #print(sensorVals)
-            mergeme.append(sensorVals)
-    #print(sensorFrames)
-    sensorVals = {
-        "1": [],
-        "2": [],
-        "3": [],
-        "4": [],
-        "5": [],
-        "6": [],
-        "7": [],
-        "8": []
-    }
-    for value in mergeme:
-        for k, v in value.items():
-            for read in v:
-                sensorVals[k].append(read)
-    
-
-    
-
-
-
-
-
-    dev.reset()
-    print("Done. Data should have printed.")
-
-if __name__ == "__main__":
     try:
-        main()
-    except struct.error:
-        print("Error getting data from Gator.")
-    except KeyboardInterrupt:
-        print("Interrupted.")
+        gator_tuple = detect_gator()
+        dev = gator_tuple[0]
+        endpoint = gator_tuple[1]
+    except:
+        print("Failed to init gator.")
+        sys.exit(1)
+    
+    while True:
+
+        try:
+            spinner.start()
+            #Perform the collection for the duration
+            # Initialization
+            rxBytes = array.array('B', [0]) * (64 * 8)
+            rxBuffer = array.array('B')
+            #Run a loop for the specified duration in seconds:
+            start_time = time.time()
+            collectDuration = 0.2
+            while time.time() - start_time < collectDuration:
+            #for i in range(1,8):
+                dev.read(endpoint.bEndpointAddress, rxBytes)
+            rxBuffer.extend(rxBytes)
+            dataBytes = bytearray(rxBuffer)
+            dataBytes.reverse() #May need to reverse or rewrite the datahelper
+            #print(dataBytes)
+            dev.reset()
+
+        except(KeyboardInterrupt, SystemExit):
+            spinner.text_color = 'red'
+            spinner.fail("mpg-foss: Process aborted.")
+            sys.exit(0)
+
+        #Move on to data collection
+        try:
+            #Init console status indicator
+            ### Instantiate classes ###
+            datum = datahelper()
+            simpacket = packetsim()
+            pprint = prints()
+            #-------------------------#
+            #Set print option
+            selection_print = False
+            printout = False
+            selection_csv = False
+            save_to_csv = False
+            #Generate given num of packets.
+            if dev == None:
+                print(f"{bsymbols.info} {bcolors.HEADER}mpg-foss: Generating {num_packets} packets...{bcolors.ENDC}")
+                data = simpacket.generate_packets(num_packets)
+                if(data == None):
+                    errorStatus = True
+            else:
+                data = dataBytes
+            error_check()
+            datum.raw_data = data
+            #----------------------------------------------------------------------------------------------#
+            ### Next, sort datum for packets ###
+            packets = datum.parse()
+            #----------------------------------------------------------------------------------------------#
+
+            threads.append(threading.Thread(target=parserThread, args=(packets,)))
+            threads[-1].start()
+
+            ### Then get, values from each packet ###
+            #Stop console status indicator
+            error_check()
+            spinner.stop()
+        except(KeyboardInterrupt, SystemExit):
+            spinner.text_color = 'red'
+            spinner.fail("mpg-foss: Process aborted.")
+            sys.exit(0)
+        except(struct.error, KeyError):
+            spinner.text_color = 'red'
+            spinner.fail("mpg-foss: Error parsing data.")
+    for thread in threads:
+        thread.join()
+    return errorStatus
+
+#Run the main function if this module is called directly.
+if __name__ == '__main__':
+   main()
