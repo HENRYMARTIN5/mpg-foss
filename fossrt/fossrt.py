@@ -44,7 +44,7 @@ def plotDataFrame(frames):
                 sensorNum = int(frame['sensor'].split('_')[1])
                 currentData['sensor' + str(sensorNum)] = cog_to_wavelength(frame['cog'])
     except:
-        print("mpg-foss-rt: Error parsing data frame!")
+        print(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
     print(currentData)
 
 def parserThread(packets):
@@ -84,7 +84,7 @@ def parserThread(packets):
         # take the json and pass it along to the next phase of processing
         plotDataFrame(data_frames)            
     except (KeyError, struct.error):
-        print("mpg-foss: Error parsing data!")
+        print(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
 
 #Initialize
 spinner = Halo(spinner='dots')
@@ -215,7 +215,7 @@ def main():
             sys.exit(0)
         except(struct.error, KeyError):
             spinner.text_color = 'red'
-            spinner.fail("mpg-foss: Error parsing data.")
+            spinner.fail(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
     for thread in threads:
         thread.join()
     return errorStatus
