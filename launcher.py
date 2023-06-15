@@ -55,8 +55,7 @@ while True:
                 forcecontinue = True
             else:
                 continue
-        _os = subprocess.run(["lsb_release", "-i"], stdout=subprocess.PIPE)
-        _os = os.stdout.decode("utf-8")
+        _os = subprocess.run(["lsb_release", "-d"], capture_output=True).stdout.decode("utf-8")
         if not forcecontinue:
             if "Ubuntu" not in _os:
                 print("Dependency installation is only supported on Ubuntu 20.04 LTS.")
