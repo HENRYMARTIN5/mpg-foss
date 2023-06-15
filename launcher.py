@@ -2,8 +2,15 @@
 import subprocess
 import os
 
+def clear():
+    if os.name == "posix":
+        subprocess.run(["clear"])
+    else:
+        subprocess.run(["cls"])
+
 while True:
 
+    clear()
     print("MPG-FOSS Util Launcher")
     print("1. FOSS FFT (calcualte the FFT of a recording, either microstrain or wavelength - deprecated, use FOSS Grapher instead)")
     print("2. FOSS Grapher (graph a recording or FFT with matplotlib)")
@@ -64,7 +71,26 @@ while True:
                     forcecontinue = True
                 else:
                     continue
-        subprocess.run(["sudo", "apt", "install", "-y", "python3-pip", "python3-tk", "python3-matplotlib", "python3-numpy"])
+        subprocess.run(["sudo", "apt", "install", "-y", "python3-pip", "python3-tk", "python3-matplotlib", "python3-numpy", "gfortran"])
         subprocess.run(["python3", "-m", "pip", "install", "-r", "requirements.txt"])
+        alternatePkgNames = {
+            "GitPython": "git",
+            "pyusb": "usb.core"
+        }
+        failed = False
+        with open("requirements.txt", "r") as f:
+            for line in f:
+                if line.startswith("#"):
+                    continue
+                line = line.strip()
+                if line in alternatePkgNames:
+                    line = alternatePkgNames[line]
+                try:
+                    __import__(line)
+                except ImportError:
+                    print("Failed to install module " + line + ". Try installing manually?")
+                    failed = True
+        if failed:
+            print("Some packages failed to install. Try installing them manually with python3 -m pip install <package name>.")
     elif choice == "8":
         exit(0)
