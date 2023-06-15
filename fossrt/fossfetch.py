@@ -180,7 +180,7 @@ def main():
             ### Get user decision on handling data ###
             if selection_print is False:
                 spinner.stop()
-                get_input = input(f"{bsymbols.info} {bcolors.OKCYAN}mpg-foss: Print cog data? [y/n]{bcolors.ENDC}")
+                get_input = "n"
                 if get_input == ("y" or "Y"):
                     selection_print = True
                     printout = True
@@ -191,7 +191,7 @@ def main():
                     print(f"{bsymbols.info} {bcolors.FAIL}Not printing cog data.{bcolors.ENDC}")
             if selection_csv is False:
                 spinner.stop()
-                second_get_input = input(f"{bsymbols.info} {bcolors.OKCYAN}mpg-foss: Write data to csv? [y/n]{bcolors.ENDC}")
+                second_get_input = "y"
                 if second_get_input == ("y" or "Y"):
                     selection_csv = True
                     save_to_csv = True

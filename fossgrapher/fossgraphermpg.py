@@ -70,7 +70,11 @@ for timestamp in timestamps:
 # now we have a list of packets, each with a timestamp and 8 sensor values. we need to put them into the `data` array
 i = 0
 for packet in new_packets:
-    data[i, 0] = packet["timestamp"]
+    try:
+        data[i, 0] = packet["timestamp"]
+    except ValueError:
+        # missing timestamp, skip this packet
+        continue
     for j in range(8):
         try:
             data[i, j+8] = str(cog_to_wavelength(packet["sensor_0" + str(j+1)]))
