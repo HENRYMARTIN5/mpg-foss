@@ -1,5 +1,6 @@
 """
 Written by Caleb C. & Andrew Valentini in 2022 for Carthage Space Sciences | WSGC | NASA
+Butchered by Henry M. in 2023 for realtime viewing of data.
 Collects data from the Gator hardware (or simulator) and saves it to a CSV file.
 """
 
@@ -19,32 +20,112 @@ import time
 import usb.core
 import usb.util
 import array
+import struct
+import threading
+from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
+import matplotlib.animation as anim
+import numpy as np
+import argparse
 
-#Initialize
+parser = argparse.ArgumentParser(description='Fetch data from the Gator hardware and save it to a CSV file.')
+parser.add_argument('output', help='The name of the CSV file to save the data to.')
+args = parser.parse_args()
+
+currentData = {
+    "sensor1": 0,
+    "sensor2": 0,
+    "sensor3": 0,
+    "sensor4": 0,
+    "sensor5": 0,
+    "sensor6": 0,
+    "sensor7": 0,
+    "sensor8": 0,
+}
+
+csvFile = None
+
+def cog_to_wavelength(binary):
+    return 1514+((int(binary, 2) * (1586-1514))/(2 ** 18)) # secret sauce
+
+def plotDataFrame(frames):
+    # set currentData
+    global currentData
+    try:
+        for frame in frames:
+            if frame is not None:
+                sensorNum = int(frame['sensor'].split('_')[1])
+                currentData['sensor' + str(sensorNum)] = cog_to_wavelength(frame['cog'])
+    except:
+        print(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
+    print(currentData)
+
+def parserThread(packets):
+    global csvFile
+    try:
+        # kicked off every time data is recieved so the program can continue working even while data is being parsed
+        # prevents issues with sensor data not appearing correctly
+        for key in packets:
+            thispacket = gatorpacket()
+            thispacket.raw_data = packets[key]
+            #This tuple contains the inner class objects of the packet class.
+            pkt_header, pkt_status, pkt_cog = thispacket.create_inner()
+            #Pull out relevant values
+            pkt_num = pkt_header.get_packet_num()
+            pkt_timestamp = pkt_header.get_timestamp()
+            #pkt_payload_len = pkt_header.get_payload_len()
+            #gator_version = pkt_header.get_version()
+            #gator_type = pkt_header.get_gator_type()
+            cog_data = pkt_cog.get_cog_data()
+            ### Get user decision on handling data ###
+            selection_csv = True
+            save_to_csv = True
+            data_frames = []
+            #TODO: Save to CSV here!
+            #------------------------------------------------------------------------------------------------------------------------------------------#
+            if save_to_csv is True:
+                spinner.start()
+                cog = {}
+                err = {}
+                for key in cog_data.keys():
+                    cog[key] = cog_data[key]["cog"]
+                    err[key] = cog_data[key]["err"]
+                for key, value in cog_data.items():
+                    columns = {'packet':pkt_num,'timestamp':pkt_timestamp, 'sensor': key, 'cog': cog[key], 'err': err[key]}
+                    data_frames.append(columns)
+            #--------------------------------------------------------------------------------------------------------------------#
+        print("mpg-foss: Grabbed data frames!")
+        # take the json and pass it along to the next phase of processing
+        plotDataFrame(data_frames)        
+        # we also want to add this data to the csv file
+        if csvFile.read() == "":
+            # write the header
+            csvFile.write("packet,timestamp,sensor,cog,err\n")
+        for frame in data_frames:
+            csvFile.write(f"{frame['packet']},{frame['timestamp']},{frame['sensor']},{frame['cog']},{frame['err']}\n")
+    except (KeyError, struct.error):
+        print(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
+
+# check if the output file exists. if it does, clear it.
+with open(args.output, "w") as f:
+    f.write("")
+csvFile = open(args.output, "a+") # we need to read and append
 spinner = Halo(spinner='dots')
 errorStatus = False
 date = time.strftime("%Y-%m-%d")
 f = files()
-output_path = f.next_path(f"./fossrt/{date}_run-%s.csv")
+output_path = f.next_path(f"./data/out/{date}_run-%s.csv")
 num_packets = 1
 collectDuration = 0
 
 def error_check():
     global errorStatus
     global spinner
-    if errorStatus:
-        spinner.text_color = 'red'
-        spinner.fail("mpg-foss: Unhandled exception!")
-        exit()
-    else:
-        spinner.text_color = 'green'
-        spinner.succeed("mpg-foss: Success!")
     spinner.start()
 
 def detect_gator():
     print(f"{bcolors.ENDC}{bsymbols.info} {bcolors.HEADER}mpg-foss: Searching for gator hardware...{bcolors.ENDC}")
     endpoint = None
-    time.sleep(0.65)
     # Find the Gator via vID & pID
     dev = usb.core.find(idVendor=0x0403, idProduct=0x6010)
     # Set endpoint if it was found
@@ -78,44 +159,23 @@ def main():
     global collectDuration
     global num_packets
     global output_path
+    global csvFile
 
     #Initialize
     spinner.start()
-    data_frames = []
+    threads = []
 
-    #Try to detect hardware
     try:
         gator_tuple = detect_gator()
         dev = gator_tuple[0]
         endpoint = gator_tuple[1]
+    except:
+        print("Failed to init gator.")
+        sys.exit(1)
+    
+    while True:
 
-        print(endpoint)
-
-        if dev == None:
-            print(f"{bsymbols.info} {bcolors.FAIL}mpg-foss: No gator hardware found!{bcolors.ENDC}")
-            selection_pkts = False
-            while selection_pkts == False:
-                spinner.stop()
-                get_input = input(f"{bsymbols.info} {bcolors.OKCYAN}mpg-foss: Num packets to sim? [int]{bcolors.ENDC}")
-                get_input = get_input.strip()
-                if get_input.isnumeric() == True:
-                    num_packets = int(get_input)
-                    selection_pkts = True
-                else:
-                    print(f"{bsymbols.info} {bcolors.FAIL}Enter an integer value!{bcolors.ENDC}")
-            spinner.start()
-        else:
-            print(f"{bsymbols.info} {bcolors.OKGREEN}mpg-foss: Gator detected!{bcolors.ENDC}")
-            collectDuration = 0
-            while collectDuration == 0:
-                spinner.stop()
-                get_input = input(f"{bsymbols.info} {bcolors.OKCYAN}mpg-foss: Duration to collect (seconds)? [int]{bcolors.ENDC}")
-                get_input = get_input.strip()
-                if get_input.isnumeric() == True:
-                    collectDuration = int(get_input)
-                else:
-                    print(f"{bsymbols.info} {bcolors.FAIL}Enter an integer value!{bcolors.ENDC}")
-            print(f"{bsymbols.info} {bcolors.OKCYAN}Collecting run...{bcolors.ENDC}")
+        try:
             spinner.start()
             #Perform the collection for the duration
             # Initialization
@@ -123,120 +183,66 @@ def main():
             rxBuffer = array.array('B')
             #Run a loop for the specified duration in seconds:
             start_time = time.time()
+            collectDuration = 0.2
             while time.time() - start_time < collectDuration:
+            #for i in range(1,8):
                 dev.read(endpoint.bEndpointAddress, rxBytes)
-                rxBuffer.extend(rxBytes)
+            rxBuffer.extend(rxBytes)
             dataBytes = bytearray(rxBuffer)
             dataBytes.reverse() #May need to reverse or rewrite the datahelper
             #print(dataBytes)
             dev.reset()
 
-    except(KeyboardInterrupt, SystemExit):
-        spinner.text_color = 'red'
-        spinner.fail("mpg-foss: Process aborted.")
+        except(KeyboardInterrupt, SystemExit):
+            spinner.text_color = 'red'
+            spinner.fail("mpg-foss: Process aborted.")
+            sys.exit(0)
 
-    #Move on to data collection
-    try:
-        #Init console status indicator
-        ### Instantiate classes ###
-        datum = datahelper()
-        simpacket = packetsim()
-        pprint = prints()
-        #-------------------------#
-        #Set print option
-        selection_print = False
-        printout = False
-        selection_csv = False
-        save_to_csv = False
-        #Generate given num of packets.
-        if dev == None:
-            print(f"{bsymbols.info} {bcolors.HEADER}mpg-foss: Generating {num_packets} packets...{bcolors.ENDC}")
-            data = simpacket.generate_packets(num_packets)
-            if(data == None):
-                errorStatus = True
-        else:
-            data = dataBytes
-        error_check()
-        datum.raw_data = data
-        #----------------------------------------------------------------------------------------------#
-        ### Next, sort datum for packets ###
-        print(f"{bsymbols.info} {bcolors.HEADER}mpg-foss: Parsing packets...{bcolors.ENDC}")
-        packets = datum.parse()
-        print(f"{bsymbols.info} {bcolors.HEADER}mpg-foss: {len(packets)} packets found...{bcolors.ENDC}", end="")
-        #----------------------------------------------------------------------------------------------#
-        ### Then get, values from each packet ###
-        for key in packets:
-            thispacket = gatorpacket()
-            thispacket.raw_data = packets[key]
-            #This tuple contains the inner class objects of the packet class.
-            pkt_header, pkt_status, pkt_cog = thispacket.create_inner()
-            #Pull out relevant values
-            pkt_num = pkt_header.get_packet_num()
-            pkt_timestamp = pkt_header.get_timestamp()
-            #pkt_payload_len = pkt_header.get_payload_len()
-            #gator_version = pkt_header.get_version()
-            #gator_type = pkt_header.get_gator_type()
-            cog_data = pkt_cog.get_cog_data()
-            ### Get user decision on handling data ###
-            if selection_print is False:
-                spinner.stop()
-                get_input = "n"
-                if get_input == ("y" or "Y"):
-                    selection_print = True
-                    printout = True
-                    print(f"{bsymbols.info} {bcolors.OKBLUE}{bcolors.BOLD}mpg-foss: Printing out cog data...{bcolors.ENDC}")
-                elif get_input == ("n" or "N"):
-                    selection_print = True
-                    printout = False
-                    print(f"{bsymbols.info} {bcolors.FAIL}Not printing cog data.{bcolors.ENDC}")
-            if selection_csv is False:
-                spinner.stop()
-                second_get_input = "y"
-                if second_get_input == ("y" or "Y"):
-                    selection_csv = True
-                    save_to_csv = True
-                    if os.path.exists(output_path) and save_to_csv is True:
-                        os.remove(output_path)
-                    print(f"{bsymbols.info} {bcolors.OKBLUE}{bcolors.BOLD}mpg-foss: Writing data to csv...{bcolors.ENDC}")
-                elif second_get_input == ("n" or "N"):
-                    selection_csv = True
-                    save_to_csv = False
-                    print(f"{bsymbols.info} {bcolors.FAIL} Not reading to csv.{bcolors.ENDC}")
-            if printout is True:
-                print(f" Packet num: {bcolors.BOLD}{pkt_num}{bcolors.ENDC} ⇒ recorded at {bcolors.BOLD}{pkt_timestamp:.4f}μs{bcolors.ENDC} collection time. CoG data ↴")
-                #print(f" DEBUG: Payload len: {pkt_payload_len} bytes | Gator type: {gator_type} | Gator version: {gator_version}") #Debug
-                #Pretty printing of cog data
-                pprint.pretty_sl(cog_data, 1)
-                print(f" {bcolors.OKBLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{bcolors.ENDC}")
-            #TODO: Save to CSV here!
-            #------------------------------------------------------------------------------------------------------------------------------------------#
-            if save_to_csv is True:
-                spinner.start()
-                cog = {}
-                err = {}
-                for key, value in cog_data.items():
-                    for k, v in value.items():
-                        if k == "cog":
-                            cog[key] = v
-                        elif k == "err":
-                            err[key] = v
-                for key, value in cog_data.items():
-                    columns = {'packet':[pkt_num],'timestamp':[pkt_timestamp], 'sensor': [key], 'cog': [cog[key]], 'err': [err[key]]}
-                    frame = pd.DataFrame(columns)
-                    frame.set_index('packet', inplace=True)
-                    data_frames.append(frame)
-            #--------------------------------------------------------------------------------------------------------------------#
-        if save_to_csv is True:
-            for frame in data_frames:
-                #frame = pd.concat(frame, keys=["Packet number n"])
-                frame.to_csv(output_path, mode = 'a', header = not os.path.exists(output_path))
-        #Stop console status indicator
-        error_check()
-        spinner.stop()
-        print(f"{bsymbols.info} {bcolors.OKGREEN}mpg-foss: Done.{bcolors.ENDC}") #Done
-    except(KeyboardInterrupt, SystemExit):
-        spinner.text_color = 'red'
-        spinner.fail("mpg-foss: Process aborted.")
+        #Move on to data collection
+        try:
+            #Init console status indicator
+            ### Instantiate classes ###
+            datum = datahelper()
+            simpacket = packetsim()
+            pprint = prints()
+            #-------------------------#
+            #Set print option
+            selection_print = False
+            printout = False
+            selection_csv = False
+            save_to_csv = False
+            #Generate given num of packets.
+            if dev == None:
+                print(f"{bsymbols.info} {bcolors.HEADER}mpg-foss: Generating {num_packets} packets...{bcolors.ENDC}")
+                data = simpacket.generate_packets(num_packets)
+                if(data == None):
+                    errorStatus = True
+            else:
+                data = dataBytes
+            error_check()
+            datum.raw_data = data
+            #----------------------------------------------------------------------------------------------#
+            ### Next, sort datum for packets ###
+            packets = datum.parse()
+            #----------------------------------------------------------------------------------------------#
+
+            threads.append(threading.Thread(target=parserThread, args=(packets,)))
+            threads[-1].start()
+
+            ### Then get, values from each packet ###
+            #Stop console status indicator
+            error_check()
+            spinner.stop()
+        except(KeyboardInterrupt, SystemExit):
+            spinner.text_color = 'red'
+            spinner.fail("mpg-foss: Process aborted. Don't worry, your data is fine :)")
+            csvFile.close()
+            sys.exit(0)
+        except(struct.error, KeyError):
+            spinner.text_color = 'red'
+            spinner.fail(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
+    for thread in threads:
+        thread.join()
     return errorStatus
 
 #Run the main function if this module is called directly.
