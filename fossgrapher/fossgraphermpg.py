@@ -77,9 +77,9 @@ for packet in new_packets:
         continue
     for j in range(12):
         try:
-            data[i, j+12] = str(cog_to_wavelength(packet["sensor_0" + str(j+1)]))
+            data[i, j+11] = str(cog_to_wavelength(packet["sensor_0" + str(j+1)]))
         except KeyError:
-            data[i, j+12] = '0'
+            data[i, j+11] = '0'
     i += 1
 
 # trim off the extra rows since we don't know how many there were going to be initially
