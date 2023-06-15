@@ -75,11 +75,11 @@ for packet in new_packets:
     except ValueError:
         # missing timestamp, skip this packet
         continue
-    for j in range(8):
+    for j in range(12):
         try:
-            data[i, j+8] = str(cog_to_wavelength(packet["sensor_0" + str(j+1)]))
+            data[i, j+12] = str(cog_to_wavelength(packet["sensor_0" + str(j+1)]))
         except KeyError:
-            data[i, j+8] = '0'
+            data[i, j+12] = '0'
     i += 1
 
 # trim off the extra rows since we don't know how many there were going to be initially
@@ -96,8 +96,8 @@ if not args.no_fourier:
         above_avg_indices = np.where(data[:, i] > avg)[0]
         above_average_times.append(above_avg_indices)
         # now sort the above average times by the ones that are the most above average
-        above_average_times[i-8] = sorted(above_average_times[i-8], key=lambda x: data[x, i] - avg, reverse=True)
-        logger.info("Above average times calculated for row " + str(i) + ": " + str(above_average_times[i-8][:10]))
+        above_average_times[i-12] = sorted(above_average_times[i-12], key=lambda x: data[x, i] - avg, reverse=True)
+        logger.info("Above average times calculated for row " + str(i) + ": " + str(above_average_times[i-12][:10]))
         logger.info("FFT calculated for row " + str(i) + ".")
     logger.info("All FFTs calculated.")
 
@@ -105,7 +105,7 @@ if not args.no_fourier:
 plt.figure()
 if not args.no_fourier:
     for i in range(len(ffts)):
-        line, = plt.plot(np.abs(ffts[i]), label='Sensor on r{}'.format(i+8))
+        line, = plt.plot(np.abs(ffts[i]), label='Sensor on r{}'.format(i+12))
         mplcursors.cursor(line)
 else:
     for i in range(12, 16):
