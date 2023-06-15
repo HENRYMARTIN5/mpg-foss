@@ -64,7 +64,7 @@ while True:
                     forcecontinue = True
                 else:
                     continue
-        subprocess.run(["sudo", "apt", "install", "python3-pip", "python3-tk", "python3-matplotlib", "python3-numpy"])
+        subprocess.run(["sudo", "apt", "install", "-y", "python3-pip", "python3-tk", "python3-matplotlib", "python3-numpy"])
         subprocess.run(["python3", "-m", "pip", "install", "-r", "requirements.txt"])
     elif choice == "8":
         exit(0)
