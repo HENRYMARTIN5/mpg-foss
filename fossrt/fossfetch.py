@@ -98,9 +98,6 @@ def parserThread(packets):
         # take the json and pass it along to the next phase of processing
         plotDataFrame(data_frames)        
         # we also want to add this data to the csv file
-        if csvFile.read() == "":
-            # write the header
-            csvFile.write("packet,timestamp,sensor,cog,err\n")
         for frame in data_frames:
             csvFile.write(f"{frame['packet']},{frame['timestamp']},{frame['sensor']},{frame['cog']},{frame['err']}\n")
     except (KeyError, struct.error):
@@ -108,13 +105,12 @@ def parserThread(packets):
 
 # check if the output file exists. if it does, clear it.
 with open(args.output, "w") as f:
-    f.write("")
+    f.write("packet,timestamp,sensor,cog,err\n")
 csvFile = open(args.output, "a+") # we need to read and append
 spinner = Halo(spinner='dots')
 errorStatus = False
 date = time.strftime("%Y-%m-%d")
 f = files()
-output_path = f.next_path(f"./data/out/{date}_run-%s.csv")
 num_packets = 1
 collectDuration = 0
 
