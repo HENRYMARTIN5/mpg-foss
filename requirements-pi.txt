@@ -1,0 +1,10 @@
+matplotlib
+numpy
+betterlib
+mplcursors
+pyusb
+pandas
+bitarray
+wheel
+halo
+GitPython
