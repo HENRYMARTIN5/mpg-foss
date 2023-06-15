@@ -72,7 +72,7 @@ while True:
                     forcecontinue = True
                 else:
                     continue
-        subprocess.run(["sudo", "apt", "install", "-y", "python3-pip", "python3-tk", "python3-matplotlib", "python3-numpy", "python3-scipy"])
+        subprocess.run(["sudo", "apt", "install", "-y", "python3-pip", "python3-tk", "python3-matplotlib", "python3-numpy", "python3-scipy", "libatlas3-base"])
         if "Raspbian" in _os:
             subprocess.run(["python3", "-m", "pip", "install", "-r", "--no-warn-script-location", "requirements-pi.txt"])
         else:
