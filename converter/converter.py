@@ -54,7 +54,7 @@ for packet in new_packets:
         try:
             # data[i, j+8] = str(cog_to_wavelength(packet["sensor_0" + str(j+1)]))
             # ^ leaves data backwards for some reason, we have to flip it around to get something compatible
-            if str(cog_to_wavelength(packet["sensor_0" + str(j+1)])) is "1514.0" or "1514":
+            if str(cog_to_wavelength(packet["sensor_0" + str(j+1)])) == "1514.0" or str(cog_to_wavelength(packet["sensor_0" + str(j+1)])) == "1514":
                 data[i, j+8] = '0'
             data[i, 8-j] = str(cog_to_wavelength(packet["sensor_0" + str(j+1)]))
         except KeyError:
