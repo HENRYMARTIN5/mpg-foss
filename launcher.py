@@ -74,9 +74,9 @@ while True:
                     continue
         subprocess.run(["sudo", "apt", "install", "-y", "python3-pip", "python3-tk", "python3-matplotlib", "python3-numpy", "python3-scipy"])
         if "Raspbian" in _os:
-            subprocess.run(["python3", "-m", "pip", "install", "-r", "requirements-pi.txt"])
+            subprocess.run(["python3", "-m", "pip", "install", "-r", "--no-warn-script-location", "requirements-pi.txt"])
         else:
-            subprocess.run(["python3", "-m", "pip", "install", "-r", "requirements.txt"])
+            subprocess.run(["python3", "-m", "pip", "install", "-r", "--no-warn-script-location", "requirements.txt"])
         alternatePkgNames = {
             "GitPython": "git",
             "pyusb": "usb.core"
