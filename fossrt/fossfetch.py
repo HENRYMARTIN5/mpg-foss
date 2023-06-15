@@ -25,7 +25,7 @@ spinner = Halo(spinner='dots')
 errorStatus = False
 date = time.strftime("%Y-%m-%d")
 f = files()
-output_path = f.next_path(f"./data/out/{date}_run-%s.csv")
+output_path = f.next_path(f"./fossrt/{date}_run-%s.csv")
 num_packets = 1
 collectDuration = 0
 

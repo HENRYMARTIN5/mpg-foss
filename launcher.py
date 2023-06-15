@@ -37,7 +37,7 @@ while True:
     elif choice == "3":
         subprocess.run(["python3", "fossrt/fossrt.py"])
     elif choice == "4":
-        subprocess.run(["python3", "fossrt/fossfetch.py"])
+        subprocess.run(["sudo", "python3", "fossrt/fossfetch.py"])
     elif choice == "5":
         subprocess.run(["python3", "cogcalc/cogcalc.py"])
     elif choice == "6":
