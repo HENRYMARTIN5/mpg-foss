@@ -49,7 +49,7 @@ while True:
         print("Checking OS...")
         forcecontinue = False
         if os.name != "posix":
-            print("Dependency installation is only supported on Ubuntu 20.04 LTS.")
+            print("Dependency installation is only supported on Ubuntu 20.04 LTS or Raspberry Pi OS.")
             inp = input("Continue anyway? (y/n) > ")
             if inp == "y":
                 forcecontinue = True
@@ -57,8 +57,8 @@ while True:
                 continue
         _os = subprocess.run(["lsb_release", "-d"], capture_output=True).stdout.decode("utf-8")
         if not forcecontinue:
-            if "Ubuntu" not in _os:
-                print("Dependency installation is only supported on Ubuntu 20.04 LTS.")
+            if "Ubuntu" not in _os or "Raspbian" not in _os:
+                print("Dependency installation is only supported on Ubuntu 20.04 LTS or Raspberry Pi OS.")
                 inp = input("Continue anyway? (y/n) > ")
                 if inp == "y":
                     forcecontinue = True
