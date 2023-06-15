@@ -162,3 +162,8 @@ cython_debug/
 # foss data dumps
 *.csv
 *.png
+
+# vscode settings
+.vscode/
+.vscode-server/
+.history/

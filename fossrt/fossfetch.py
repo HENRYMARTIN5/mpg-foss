@@ -3,15 +3,21 @@ Written by Caleb C. & Andrew Valentini in 2022 for Carthage Space Sciences | WSG
 Collects data from the Gator hardware (or simulator) and saves it to a CSV file.
 """
 
-from halo import Halo
-from formatmodule import bcolors, bsymbols, prints, files
-from fosmodule import datahelper, gatorpacket, packetsim
-import pandas as pd
 import os
+import sys
+import inspect
+
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0, parentdir) 
+
+from halo import Halo
+from common.formatmodule import bcolors, bsymbols, prints, files
+from common.fosmodule import datahelper, gatorpacket, packetsim
+import pandas as pd
 import time
 import usb.core
 import usb.util
-import sys
 import array
 
 #Initialize
