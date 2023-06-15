@@ -89,7 +89,7 @@ ffts = []
 above_average_times = []  # List to store the times when a value is above the average for each line
 
 if not args.no_fourier:
-    for i in range(8, 12):
+    for i in range(12, 16):
         logger.info("Calculating FFT for row " + str(i) + "...")
         ffts.append(np.fft.fft(data[:, i]))
         avg = np.mean(data[:, i])
@@ -108,7 +108,7 @@ if not args.no_fourier:
         line, = plt.plot(np.abs(ffts[i]), label='Sensor on r{}'.format(i+8))
         mplcursors.cursor(line)
 else:
-    for i in range(8, 12):
+    for i in range(12, 16):
         line, = plt.plot(data[:, i], label='Sensor on r{}'.format(i))
         mplcursors.cursor(line)
 if not args.no_fourier:
