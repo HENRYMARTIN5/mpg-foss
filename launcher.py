@@ -19,7 +19,8 @@ while True:
     print("5. CoG Value Calculator (convert between CoG and wavelength/microstrain)")
     print("6. Data Converter (get a csv from unofficial to official format)")
     print("7. Install dependencies")
-    print("8. Exit")
+    print("8. Update Repo")
+    print("9. Exit")
 
     choice = input(" > ")
 
@@ -93,4 +94,45 @@ while True:
         if failed:
             print("Some packages failed to install. Try installing them manually with python3 -m pip install <package name>.")
     elif choice == "8":
+        # we double-check here that nothing has been modified locally. if there are unpushed commits, we prompt to push them. if there are uncommitted changes, we prompt to stash, commit, or discard them.
+        # if there are no unpushed commits or uncommitted changes, we just pull.
+        # we also want to make sure that conflicts are taken into account - if there are any, we have to let the user resolve them.
+
+        # check for unpushed commits
+        print("Checking for unpushed commits...")
+        unpushed = subprocess.run(["git", "log", "@{u}..", "--oneline"], capture_output=True).stdout.decode("utf-8")
+        if unpushed != "":
+            print("You have unpushed commits. Please push them before updating.")
+            inp = input("Push commits? (y/n) > ")
+            if inp == "y":
+                subprocess.run(["git", "push"])
+            else:
+                continue
+        # check for uncommitted changes
+        print("Checking for uncommitted changes...")
+        uncommitted = subprocess.run(["git", "status", "--porcelain"], capture_output=True).stdout.decode("utf-8")
+        if uncommitted != "":
+            print("You have uncommitted changes. Please stash, commit, or discard them before updating.")
+            inp = input("Stash changes? (y/n) > ")
+            if inp == "y":
+                message = input("Stash message > ")
+                subprocess.run(["git", "stash", "push", "-m", message])
+            else:
+                inp = input("Commit changes? (y/n) > ")
+                if inp == "y":
+                    message = input("Commit message > ")
+                    subprocess.run(["git", "commit", "-m", message])
+                    inp = input("Push changes? (y/n) > ")
+                    if inp == "y":
+                        subprocess.run(["git", "push"])
+                else:
+                    inp = input("Discard changes? (y/n) > ")
+                    if inp == "y":
+                        subprocess.run(["git", "reset", "--hard"])
+                    else:
+                        continue
+        # pull
+        print("Pulling...")
+        subprocess.run(["git", "pull"])
+    elif choice == "9":
         exit(0)
