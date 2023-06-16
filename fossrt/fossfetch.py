@@ -60,8 +60,26 @@ def plotDataFrame(frames):
         print(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
     print(currentData)
 
-def parserThread(packets):
+def parserThread(rxBuffer):
     global csvFile
+    dataBytes = bytearray(rxBuffer)
+    dataBytes.reverse() #May need to reverse or rewrite the datahelper
+    #Init console status indicator
+    ### Instantiate classes ###
+    datum = datahelper()
+    simpacket = packetsim()
+    pprint = prints()
+    #-------------------------#
+    #Set print option
+    selection_print = False
+    printout = False
+    selection_csv = False
+    save_to_csv = False
+    datum.raw_data = dataBytes
+    #----------------------------------------------------------------------------------------------#
+    ### Next, sort datum for packets ###
+    packets = datum.parse()
+    #----------------------------------------------------------------------------------------------#
     try:
         # kicked off every time data is recieved so the program can continue working even while data is being parsed
         # prevents issues with sensor data not appearing correctly
@@ -169,74 +187,25 @@ def main():
         print("Failed to init gator.")
         sys.exit(1)
     
-    while True:
-
-        try:
-            spinner.start()
-            #Perform the collection for the duration
-            # Initialization
+    try:
+        spinner.start()
+        while True:
             rxBytes = array.array('B', [0]) * (64 * 8)
             rxBuffer = array.array('B')
-            #Run a loop for the specified duration in seconds:
-            start_time = time.time()
-            collectDuration = 0.2
-            while time.time() - start_time < collectDuration:
-            #for i in range(1,8):
-                dev.read(endpoint.bEndpointAddress, rxBytes)
+            dev.read(endpoint.bEndpointAddress, rxBytes)
             rxBuffer.extend(rxBytes)
-            dataBytes = bytearray(rxBuffer)
-            dataBytes.reverse() #May need to reverse or rewrite the datahelper
-            #print(dataBytes)
-            dev.reset()
-
-        except(KeyboardInterrupt, SystemExit):
-            spinner.text_color = 'red'
-            spinner.fail("mpg-foss: Process aborted.")
-            sys.exit(0)
-
-        #Move on to data collection
-        try:
-            #Init console status indicator
-            ### Instantiate classes ###
-            datum = datahelper()
-            simpacket = packetsim()
-            pprint = prints()
-            #-------------------------#
-            #Set print option
-            selection_print = False
-            printout = False
-            selection_csv = False
-            save_to_csv = False
-            #Generate given num of packets.
-            if dev == None:
-                print(f"{bsymbols.info} {bcolors.HEADER}mpg-foss: Generating {num_packets} packets...{bcolors.ENDC}")
-                data = simpacket.generate_packets(num_packets)
-                if(data == None):
-                    errorStatus = True
-            else:
-                data = dataBytes
-            error_check()
-            datum.raw_data = data
-            #----------------------------------------------------------------------------------------------#
-            ### Next, sort datum for packets ###
-            packets = datum.parse()
-            #----------------------------------------------------------------------------------------------#
-
-            threads.append(threading.Thread(target=parserThread, args=(packets,)))
+            threads.append(threading.Thread(target=parserThread, args=(rxBuffer,)))
             threads[-1].start()
 
-            ### Then get, values from each packet ###
-            #Stop console status indicator
-            error_check()
-            spinner.stop()
-        except(KeyboardInterrupt, SystemExit):
-            spinner.text_color = 'red'
-            spinner.fail("mpg-foss: Process aborted. Don't worry, your data is fine :)")
-            csvFile.close()
-            sys.exit(0)
-        except(struct.error, KeyError):
-            spinner.text_color = 'red'
-            spinner.fail(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
+    except(KeyboardInterrupt, SystemExit):
+        spinner.text_color = 'red'
+        spinner.fail("mpg-foss: Process aborted.")
+        sys.exit(0)
+
+    except(struct.error, KeyError):
+        spinner.text_color = 'red'
+        spinner.fail(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
+
     for thread in threads:
         thread.join()
     return errorStatus
