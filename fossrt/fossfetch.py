@@ -65,6 +65,7 @@ def parserThread(packets):
     try:
         # kicked off every time data is recieved so the program can continue working even while data is being parsed
         # prevents issues with sensor data not appearing correctly
+        data_frames = []
         for key in packets:
             thispacket = gatorpacket()
             thispacket.raw_data = packets[key]
@@ -80,7 +81,6 @@ def parserThread(packets):
             ### Get user decision on handling data ###
             selection_csv = True
             save_to_csv = True
-            data_frames = []
             #TODO: Save to CSV here!
             #------------------------------------------------------------------------------------------------------------------------------------------#
             if save_to_csv is True:
