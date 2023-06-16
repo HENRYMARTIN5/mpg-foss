@@ -175,13 +175,18 @@ def main():
 
     except(KeyboardInterrupt, SystemExit):
         print("mpg-foss: Process aborted.")
-        sys.exit(0)
 
     except(struct.error, KeyError):
         print(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
 
+    spinner.start()
+    total = len(threads)
+    i = 0
     for thread in threads:
+        spinner.text = f"mpg-foss: Cleaning up threads... {i}/{total}"
         thread.join()
+        i += 1
+    spinner.succeed("mpg-foss: Threads cleaned up. Exiting...")
     return errorStatus
 
 #Run the main function if this module is called directly.
