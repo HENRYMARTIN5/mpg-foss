@@ -60,8 +60,10 @@ def plotDataFrame(frames):
         print(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
     print(currentData)
 
-def parserThread(rxBuffer):
+def parserThread(rxBytes):
     global csvFile
+    rxBuffer = array.array('B')
+    rxBuffer.extend(rxBytes)
     dataBytes = bytearray(rxBuffer)
     dataBytes.reverse() #May need to reverse or rewrite the datahelper
     #Init console status indicator
@@ -186,25 +188,22 @@ def main():
     except:
         print("Failed to init gator.")
         sys.exit(1)
-    
+
+    starterRxBytes = array.array('B', [0]) * (64 * 8)
+
     try:
-        spinner.start()
         while True:
-            rxBytes = array.array('B', [0]) * (64 * 8)
-            rxBuffer = array.array('B')
+            rxBytes = starterRxBytes
             dev.read(endpoint.bEndpointAddress, rxBytes)
-            rxBuffer.extend(rxBytes)
-            threads.append(threading.Thread(target=parserThread, args=(rxBuffer,)))
+            threads.append(threading.Thread(target=parserThread, args=(rxBytes,)))
             threads[-1].start()
 
     except(KeyboardInterrupt, SystemExit):
-        spinner.text_color = 'red'
-        spinner.fail("mpg-foss: Process aborted.")
+        print("mpg-foss: Process aborted.")
         sys.exit(0)
 
     except(struct.error, KeyError):
-        spinner.text_color = 'red'
-        spinner.fail(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
+        print(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
 
     for thread in threads:
         thread.join()
