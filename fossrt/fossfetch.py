@@ -32,33 +32,10 @@ parser = argparse.ArgumentParser(description='Fetch data from the Gator hardware
 parser.add_argument('output', help='The name of the CSV file to save the data to.')
 args = parser.parse_args()
 
-currentData = {
-    "sensor1": 0,
-    "sensor2": 0,
-    "sensor3": 0,
-    "sensor4": 0,
-    "sensor5": 0,
-    "sensor6": 0,
-    "sensor7": 0,
-    "sensor8": 0,
-}
-
 csvFile = None
 
 def cog_to_wavelength(binary):
     return 1514+((int(binary, 2) * (1586-1514))/(2 ** 18)) # secret sauce
-
-def plotDataFrame(frames):
-    # set currentData
-    global currentData
-    try:
-        for frame in frames:
-            if frame is not None:
-                sensorNum = int(frame['sensor'].split('_')[1])
-                currentData['sensor' + str(sensorNum)] = cog_to_wavelength(frame['cog'])
-    except:
-        print(f"{bcolors.WARNING}mpg-foss: Error parsing data!{bcolors.ENDC}")
-    print(currentData)
 
 def parserThread(rxBytes):
     global csvFile
@@ -115,8 +92,6 @@ def parserThread(rxBytes):
                     data_frames.append(columns)
             #--------------------------------------------------------------------------------------------------------------------#
         print("mpg-foss: Grabbed data frames!")
-        # take the json and pass it along to the next phase of processing
-        plotDataFrame(data_frames)        
         # we also want to add this data to the csv file
         for frame in data_frames:
             csvFile.write(f"{frame['packet']},{frame['timestamp']},{frame['sensor']},{frame['cog']},{frame['err']}\n")
