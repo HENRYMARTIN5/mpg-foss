@@ -13,7 +13,7 @@ i = dev[0].interfaces()[0].bInterfaceNumber
 
 dev.reset()
 
-debug = False
+debug = True
 
 if dev.is_kernel_driver_active(i):
     try:
@@ -66,10 +66,13 @@ while True:
         t.start()
     except usb.core.USBTimeoutError:
         if debug:
-            print("timeout")
+            print("timeout\n")
+    except usb.core.USBError:
+        if debug:
+            print("usberror\n")
     except KeyboardInterrupt:
         print(" "*30 + "\nSaving csv and exiting...")
-        data.to_csv("data.csv", index=False)
+        data.to_csv("weight_data.csv", index=False)
         sys.exit(0)
     except Exception as e:
         raise Exception("Something went wrong: %s" % str(e))

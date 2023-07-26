@@ -12,6 +12,7 @@ parser.add_argument('microstrain', metavar='microstrain', type=str, help='Path t
 parser.add_argument('weight', metavar='weight', type=str, help='Path to weight data')
 parser.add_argument('output', metavar='output', type=str, help='Path to output file')
 args = parser.parse_args()
+logger.debug("parsed args")
 
 def convert_to_timestamp(timestamp_str):
     try:
@@ -24,7 +25,6 @@ def convert_to_timestamp(timestamp_str):
 def unique_strings(array):
     return list(set(array))
 
-logger.debug("parsed args")
 logger.info("Microstrain file: " + args.microstrain)
 logger.info("Weight file: " + args.weight)
 logger.info("Output file: " + args.output)
