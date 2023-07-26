@@ -5,8 +5,10 @@ import threading
 import pandas as pd
 
 dev = usb.core.find(idVendor=0x1a86,idProduct=0x7523)
+if dev is None:
+    raise Exception("Plug in the scale!")
+assert dev is not None
 ep = dev[0].interfaces()[0].endpoints()[0]
-
 i = dev[0].interfaces()[0].bInterfaceNumber
 
 dev.reset()
