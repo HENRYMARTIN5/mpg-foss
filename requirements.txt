@@ -9,3 +9,4 @@ bitarray
 wheel
 halo
 GitPython
+python-dateutil
