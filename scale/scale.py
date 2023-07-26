@@ -3,6 +3,7 @@ import usb.util
 import sys
 import threading
 import pandas as pd
+import datetime
 
 dev = usb.core.find(idVendor=0x1a86,idProduct=0x7523)
 if dev is None:
@@ -21,7 +22,7 @@ if dev.is_kernel_driver_active(i):
     except usb.core.USBError as e:
         raise Exception("Failed to detatch kernel driver: %s" % str(e))
     
-data = pd.DataFrame(columns=["weight", "time"])
+data = pd.DataFrame(columns=["weight", "time", "matlab_time"])
     
 dev.set_configuration()
 
@@ -43,6 +44,8 @@ charmap = {
     57:  '9',
 }
 
+start_seconds = datetime.datetime.now().timestamp()
+
 def decodeThread(r):
     global current_weight
     r = r[:-4]
@@ -55,7 +58,7 @@ def decodeThread(r):
     print(decoded, end=" "*30 + "\r")
     try:
         current_weight = float(decoded)
-        data.loc[len(data)] = [current_weight, pd.Timestamp.now()]
+        data.loc[len(data)] = [current_weight, pd.Timestamp.now(), datetime.datetime.now().timestamp() - start_seconds]
     except ValueError:
         print(decoded + " (invalid!)", end="\r")
 
