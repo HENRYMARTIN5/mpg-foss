@@ -1,5 +1,7 @@
-#Written by Caleb C. in 2022 for Carthage Space Sciences | WSGC | NASA
-#Module to contain classes for mpg-foss.
+"""
+Written by Caleb C. in 2022 for Carthage Space Sciences | WSGC | NASA
+Module to contain classes for mpg-foss.
+"""
 
 class datahelper:
     import re

@@ -39,20 +39,17 @@ def cog_to_wavelength(binary):
 
 def parserThread(rxBytes):
     global csvFile
-    rxBuffer = array.array('B')
+
+    #Convert to bytearray
+    rxBuffer = array.array('B') #Unsigned char
     rxBuffer.extend(rxBytes)
     dataBytes = bytearray(rxBuffer)
     dataBytes.reverse() #May need to reverse or rewrite the datahelper
     #Init console status indicator
     ### Instantiate classes ###
     datum = datahelper()
-    simpacket = packetsim()
-    pprint = prints()
     #-------------------------#
     #Set print option
-    selection_print = False
-    printout = False
-    selection_csv = False
     save_to_csv = False
     datum.raw_data = dataBytes
     #----------------------------------------------------------------------------------------------#
