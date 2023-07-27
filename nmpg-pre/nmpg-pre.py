@@ -4,13 +4,14 @@ import pandas as pd
 from dateutil.parser import parse
 from betterlib.logging import Logger
 import time
+import os
 np.random.seed(0)
 
 logger = Logger("./nmpg-pre.log", "NMPG Preprocessor")
 
 parser = argparse.ArgumentParser(description='Data pre-processing script for NMPG/MPG-FOSS')
 parser.add_argument('microstrain', metavar='microstrain', type=str, help='Path to microstrain data')
-parser.add_argument('weight', metavar='weight', type=str, help='Path to weight data')
+parser.add_argument('weight', metavar='weight', type=str, help='Path to weight data (directory, parts will be combined)')
 parser.add_argument('output', metavar='output', type=str, help='Path to output file')
 args = parser.parse_args()
 logger.debug("parsed args")
@@ -29,12 +30,33 @@ def unique_strings(array):
 def frf(x, y):
     return np.fft.fft(x) / np.fft.fft(y)
 
-logger.info("Microstrain file: " + args.microstrain)
+logger.info("Sorting microstrain data...")
+microstrain_files = os.listdir(args.microstrain)
+microstrain_files.sort()
+logger.info("Merging microstrain data...")
+new_data = """Channel 1; Sensor 1; Sensor 2; Sensor 3; Sensor 4; Sensor 5; Sensor 6; Sensor 7; Sensor 8
+
+receive_ts; packet_ts; seqnr; sync status; TEC status; missed frames; channel; numsens; wavelength 1; wavelength 2; wavelength 3; wavelength 4; wavelength 5; wavelength 6; wavelength 7; wavelength 8
+"""
+for file in microstrain_files:
+    print(f"Merging microstrain file {microstrain_files.index(file)+1}/{len(microstrain_files)}", end="\r")
+    with open(os.path.join(args.microstrain, file), "r") as f:
+        lines = f.readlines()
+        new_data += "".join(lines[3:])
+print()
+logger.info("Microstrain data merged.")
+logger.info("Saving...")
+with open("./microstrain_joined.csv", "w") as f:
+    f.write(new_data)
+
+new_microstrain = "./microstrain_joined.csv"
+
+logger.info("Microstrain file: " + new_microstrain)
 logger.info("Weight file: " + args.weight)
 logger.info("Output file: " + args.output)
 
 logger.info("Loading microstrain data...")
-microstrain = pd.read_csv(args.microstrain, delimiter=';', skiprows=3, parse_dates=True).values
+microstrain = pd.read_csv(new_microstrain, delimiter=';', skiprows=3, parse_dates=True).values
 logger.info("Loading weight data...")
 weight = pd.read_csv(args.weight, delimiter=',', header=None).values
 logger.info("Data loaded.")
@@ -120,6 +142,14 @@ for interval in intervals:
     frf_y = np.array(frf_y)
     result = frf(frf_x, frf_y)
     frfs.append([interval, result, 0.0]) # TODO: weight pairing
+
+longest = 0
+for frf in frfs:
+    if len(frf[1]) > longest:
+        longest = len(frf[1])
+for frf in frfs:
+    if len(frf[1]) < longest:
+        frf[1] = np.pad(frf[1], (0, longest - len(frf[1])))
 
 # logger.info("Merging data...")
 # indices = np.searchsorted(weight[:, 0], microstrain[:, 0])
