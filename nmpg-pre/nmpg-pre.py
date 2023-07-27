@@ -128,9 +128,14 @@ logger.info("Starting FRF processing...")
 for interval in intervals:
     print(f"Processing interval {interval} ({intervals.index(interval)+1}/{total}) - this is slow, so be patient (finding microstrain matches)                     ", end="\r") 
     data = []
+    i = 0
     for row in microstrain:
         if row[0][0:-5].endswith(interval[-10:]):
             data.append(row)
+            microstrain = np.delete(microstrain, np.where(microstrain[:, 0] == row[0]), axis=0)
+        if i > 100000:
+            break # lots of padding, but it still makes it faster than it was
+        i += 1
 
     print(f"Processing interval {interval} ({intervals.index(interval)+1}/{total}) - this is slow, so be patient (calculating frf on {len(data)} data points)      ", end="\r")
     frf_x = []
