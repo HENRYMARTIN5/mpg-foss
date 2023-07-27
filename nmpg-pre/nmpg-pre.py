@@ -125,17 +125,14 @@ logger.debug("Calculating length...")
 total = len(intervals)
 logger.debug(f"Length: {total}")
 logger.info("Starting FRF processing...")
+startrow = 0
 for interval in intervals:
     print(f"Processing interval {interval} ({intervals.index(interval)+1}/{total}) - this is slow, so be patient (finding microstrain matches)                     ", end="\r") 
     data = []
-    i = 0
-    for row in microstrain:
-        if row[0][0:-5].endswith(interval[-10:]):
-            data.append(row)
-            microstrain = np.delete(microstrain, np.where(microstrain[:, 0] == row[0]), axis=0)
-        if i > 100000:
-            break # lots of padding, but it still makes it faster than it was
-        i += 1
+    for i in range(startrow, len(microstrain)):
+        if microstrain[i, 0][0:-5].endswith(interval[-10:]):
+            data.append(microstrain[i])
+            startrow = i # speed gets exponentially better with this implemented
 
     print(f"Processing interval {interval} ({intervals.index(interval)+1}/{total}) - this is slow, so be patient (calculating frf on {len(data)} data points)      ", end="\r")
     frf_x = []
@@ -145,16 +142,19 @@ for interval in intervals:
         frf_y.append(row[fbg2+7])
     frf_x = np.array(frf_x)
     frf_y = np.array(frf_y)
-    result = frf(frf_x, frf_y)
+    try:
+        result = frf(frf_x, frf_y)
+    except ValueError:
+        result = np.array([0.0])
     frfs.append([interval, result, 0.0]) # TODO: weight pairing
 
 longest = 0
-for frf in frfs:
-    if len(frf[1]) > longest:
-        longest = len(frf[1])
-for frf in frfs:
-    if len(frf[1]) < longest:
-        frf[1] = np.pad(frf[1], (0, longest - len(frf[1])))
+for _frf in frfs:
+    if len(_frf[1]) > longest:
+        longest = len(_frf[1])
+for _frf in frfs:
+    if len(_frf[1]) < longest:
+        _frf[1] = np.pad(_frf[1], (0, longest - len(_frf[1])))
 
 # logger.info("Merging data...")
 # indices = np.searchsorted(weight[:, 0], microstrain[:, 0])
