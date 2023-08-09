@@ -162,7 +162,9 @@ cython_debug/
 # foss data dumps
 *.csv
 *.png
+*.json
 data/
+stripped/
 
 # vscode settings
 .vscode/

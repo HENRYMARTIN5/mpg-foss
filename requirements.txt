@@ -10,3 +10,4 @@ wheel
 halo
 GitPython
 python-dateutil
+tqdm

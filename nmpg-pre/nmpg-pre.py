@@ -3,16 +3,23 @@ import numpy as np
 import pandas as pd
 from dateutil.parser import parse
 from betterlib.logging import Logger
-import time
 import os
+from tqdm import tqdm
+import json
+import sys
+
 np.random.seed(0)
 
 logger = Logger("./nmpg-pre.log", "NMPG Preprocessor")
 
+debug = True
+
+def space(length: int) -> str:
+    return " " * length
+
 parser = argparse.ArgumentParser(description='Data pre-processing script for NMPG/MPG-FOSS')
-parser.add_argument('microstrain', metavar='microstrain', type=str, help='Path to microstrain data')
-parser.add_argument('weight', metavar='weight', type=str, help='Path to weight data (directory, parts will be combined)')
-parser.add_argument('output', metavar='output', type=str, help='Path to output file')
+parser.add_argument('data', metavar='data', type=str, help='Path to data (standard format: microstrain dir and weight_data.csv)')
+parser.add_argument('--indent', dest='indent', action='store_true', help='Export JSON with indentation')
 args = parser.parse_args()
 logger.debug("parsed args")
 
@@ -23,6 +30,10 @@ def convert_to_timestamp(timestamp_str):
     except ValueError as e:
         print(f"Error parsing timestamp: <{e}>")
         return None
+    
+microstrain_path = os.path.join(args.data, "microstrain")
+weight_path = os.path.join(args.data, "weight_data.csv")
+output_path = os.path.join(args.data, "processed_drain.json")
 
 def unique_strings(array):
     return list(set(array))
@@ -31,7 +42,7 @@ def frf(x, y):
     return np.fft.fft(x) / np.fft.fft(y)
 
 logger.info("Sorting microstrain data...")
-microstrain_files = os.listdir(args.microstrain)
+microstrain_files = os.listdir(microstrain_path)
 microstrain_files.sort()
 logger.info("Merging microstrain data...")
 new_data = """Channel 1; Sensor 1; Sensor 2; Sensor 3; Sensor 4; Sensor 5; Sensor 6; Sensor 7; Sensor 8
@@ -40,7 +51,7 @@ receive_ts; packet_ts; seqnr; sync status; TEC status; missed frames; channel; n
 """
 for file in microstrain_files:
     print(f"Merging microstrain file {microstrain_files.index(file)+1}/{len(microstrain_files)}", end="\r")
-    with open(os.path.join(args.microstrain, file), "r") as f:
+    with open(os.path.join(microstrain_path, file), "r") as f:
         lines = f.readlines()
         new_data += "".join(lines[3:])
 print()
@@ -52,37 +63,26 @@ with open("./microstrain_joined.csv", "w") as f:
 new_microstrain = "./microstrain_joined.csv"
 
 logger.info("Microstrain file: " + new_microstrain)
-logger.info("Weight file: " + args.weight)
-logger.info("Output file: " + args.output)
+logger.info("Weight file: " + weight_path)
+logger.info("Output file: " + output_path)
 
 logger.info("Loading microstrain data...")
 microstrain = pd.read_csv(new_microstrain, delimiter=';', skiprows=3, parse_dates=True).values
 logger.info("Loading weight data...")
-weight = pd.read_csv(args.weight, delimiter=',', header=None).values
+weight = pd.read_csv(weight_path, delimiter=',', header=None, skiprows=1).values
 logger.info("Data loaded.")
 
 logger.info("Converting timestamps...")
 logger.debug("Calculating length...")
 total = len(microstrain)
 logger.debug(f"Length: {total}")
-start_time = time.time()
-time_remaining = "unknown"
-for i in range(total):
-    print(f"Converting microstrain timestamps {i+1}/{total} - ETA: {time_remaining} {' '*30}", end="\r")
+for i in tqdm(range(total), desc="Converting timestamps", unit="rows"):
     timestamp = convert_to_timestamp(microstrain[i, 0])
     microstrain[i, 0] = timestamp
-    if i % 10000 == 0:
-        time_sofar = time.time() - start_time
-        start_time = time.time()
-        try:
-            time_remaining = str(pd.Timedelta(seconds=(total - i) * time_sofar / i))
-        except ZeroDivisionError:
-            time_remaining = "unknown"
-print()
 logger.debug("Calculating length...")
 total = len(weight)
 logger.debug(f"Length: {total}")
-for i in range(total):
+for i in tqdm(range(total), desc="Converting timestamps", unit="rows"):
     print(f"Converting weight timestamps {i+1}/{total}", end="\r")
     timestamp = convert_to_timestamp(weight[i, 1])
     weight[i, 1] = timestamp
@@ -121,20 +121,54 @@ else:
     fbg1 = 7
     fbg2 = 2
 
-logger.debug("Calculating length...")
-total = len(intervals)
-logger.debug(f"Length: {total}")
 logger.info("Starting FRF processing...")
 startrow = 0
-for interval in intervals:
-    print(f"Processing interval {interval} ({intervals.index(interval)+1}/{total}) - this is slow, so be patient (finding microstrain matches)                     ", end="\r") 
+weight_startrow = 0
+for i in tqdm(range(len(intervals)), desc="Processing FRFs", unit="intervals"):
+    interval = intervals[i]
+    debug_info = "startrow: " + str(startrow) + ", weight startrow: " + str(weight_startrow)
     data = []
     for i in range(startrow, len(microstrain)):
         if microstrain[i, 0][0:-5].endswith(interval[-10:]):
             data.append(microstrain[i])
             startrow = i # speed gets exponentially better with this implemented
+    # something similar but using the microstrain timestamp to find matches in the weight data
+    found_something = False
+    curr_interval = interval
+    tries = 0
+    weight_matches = []
+    maxtries = 3
+    while not found_something:
+        tries += 1
+        weight_matches = []
+        for i in range(weight_startrow, len(weight)):
+            row = weight[i]
+            if row[1][0:-5].endswith(interval[-10:]):
+                weight_matches.append(row)
+                weight_startrow = i
+        if len(weight_matches) > 0:
+            found_something = True
+            break
+        if tries > maxtries:
+            # logger.warn("!!! No weight data for interval " + interval + " !!!")
+            break
+        # try incrementing the interval by 0.1s
+        curr_interval = str(parse(curr_interval) + pd.Timedelta("0.1s"))
+        if curr_interval.endswith("00000"):
+            curr_interval = curr_interval[:-4]
+    # calculate weight average
+    if found_something:
+        weight_avg = 0.0
+        for match in weight_matches:
+            weight_avg += match[0]
+        try:
+            weight_avg /= len(weight_matches)
+        except ZeroDivisionError:
+            logger.critical("It should be impossible to get here! Something has gone horribly wrong!")
+            sys.exit(1)
+    else:
+        weight_avg = 0.0
 
-    print(f"Processing interval {interval} ({intervals.index(interval)+1}/{total}) - this is slow, so be patient (calculating frf on {len(data)} data points)      ", end="\r")
     frf_x = []
     frf_y = []
     for row in data:
@@ -146,21 +180,38 @@ for interval in intervals:
         result = frf(frf_x, frf_y)
     except ValueError:
         result = np.array([0.0])
-    frfs.append([interval, result, 0.0]) # TODO: weight pairing
+    frfs.append([interval, result, weight_avg])
 
-longest = 0
-for _frf in frfs:
-    if len(_frf[1]) > longest:
-        longest = len(_frf[1])
-for _frf in frfs:
-    if len(_frf[1]) < longest:
-        _frf[1] = np.pad(_frf[1], (0, longest - len(_frf[1])))
+newfrfs = []
+for frf in frfs:
+    newlist = frf[1].tolist()
+    for i in range(len(newlist)):
+        # convert complex numbers to real numbers
+        newlist[i] = newlist[i].real
+    newfrfs.append([frf[0], newlist, frf[2]])
 
-# logger.info("Merging data...")
-# indices = np.searchsorted(weight[:, 0], microstrain[:, 0])
-# merged = np.hstack((microstrain, weight[indices, 1:]))
-# logger.info("Data merged.")
+frfs = newfrfs
 
-logger.info("Saving data...")
-np.savetxt(args.output, frfs, delimiter=',', fmt='%s')
+logger.info("FRFs calculated.")
+logger.info("Pruning zeros...")
+newfrfs = []
+for i in tqdm(range(len(frfs)), desc="Pruning zeros", unit="intervals"):
+    _frf = frfs[i]
+    if _frf[2] != 0:
+        newfrfs.append(_frf)
+frfs = newfrfs
+
+logger.info("Saving data..." + space(100))
+# save to json
+with open(output_path, "w") as f:
+    if args.indent:
+        json.dump(frfs, f, indent=4)
+    else:
+        json.dump(frfs, f)
 logger.info("Data saved.")
+
+logger.info("Cleaning up...")
+os.remove(new_microstrain)
+logger.info("Cleanup complete.")
+
+logger.info("Done.")
