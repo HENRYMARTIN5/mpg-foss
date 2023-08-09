@@ -20,7 +20,7 @@ dirs = os.listdir(args.data)
 dirs.sort()
 
 for i in tqdm(range(len(dirs)), desc="Preprocessing data...", unit="drains"):
-    os.system("python3 nmpg-pre/nmpg-pre.py " + os.path.join(args.data, dirs[i]) + " --no-interact " + ("--indent" if args.indent else ""))
+    os.system("python3 nmpg-pre/nmpg-pre.py \"" + os.path.join(args.data, dirs[i]) + "\" --no-interact " + ("--indent" if args.indent else ""))
     logger.info("Preprocessed drain " + str(i+1) + "/" + str(len(dirs)) + " (" + dirs[i] + ")")
 
 logger.info("Preprocessing complete.")
