@@ -20,6 +20,7 @@ def space(length: int) -> str:
 parser = argparse.ArgumentParser(description='Data pre-processing script for NMPG/MPG-FOSS')
 parser.add_argument('data', metavar='data', type=str, help='Path to data (standard format: microstrain dir and weight_data.csv)')
 parser.add_argument('--indent', dest='indent', action='store_true', help='Export JSON with indentation')
+parser.add_argument('--no-interact', dest='interact', action='store_false', help='Disable interactive mode (default: enabled)')
 args = parser.parse_args()
 logger.debug("parsed args")
 
@@ -103,21 +104,26 @@ intervals = [str(i)[:-5] for i in intervals]
 frfs = []
 # format: [<timestamp>, data: [...], <weight average>]
 
-logger.debug("Waiting for user choice...")
-inp = input("By default, this script takes FRFs from FBG 7 to FBG 2. If you don't know what this is, just ignore it. Do you want to change this? [y/N] ")
-if inp.lower() == "y":
-    try:
-        logger.debug("User chose to change FRFs.")
-        logger.debug("Waiting for user input...")
-        fbg1 = int(input("Enter the number of the sensor FBG to include: "))
-        fbg2 = int(input("Enter the number of the correction FBG to include: "))
-        logger.debug("User input received.")
-    except ValueError:
-        logger.error("Invalid input, using default 7 to 2.")
+if args.interact:
+    logger.debug("Waiting for user choice...")
+    inp = input("By default, this script takes FRFs from FBG 7 to FBG 2. If you don't know what this is, just ignore it. Do you want to change this? [y/N] ")
+    if inp.lower() == "y":
+        try:
+            logger.debug("User chose to change FRFs.")
+            logger.debug("Waiting for user input...")
+            fbg1 = int(input("Enter the number of the sensor FBG to include: "))
+            fbg2 = int(input("Enter the number of the correction FBG to include: "))
+            logger.debug("User input received.")
+        except ValueError:
+            logger.error("Invalid input, using default 7 to 2.")
+            fbg1 = 7
+            fbg2 = 2
+    else:
+        logger.debug("User chose to use default FRFs.")
         fbg1 = 7
         fbg2 = 2
 else:
-    logger.debug("User chose to use default FRFs.")
+    logger.debug("Interactive mode disabled, using default FRFs.")
     fbg1 = 7
     fbg2 = 2
 
