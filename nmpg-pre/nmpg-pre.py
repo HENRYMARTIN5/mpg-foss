@@ -131,7 +131,7 @@ else:
 logger.info("Starting FRF processing...")
 startrow = 0
 weight_startrow = 0
-for i in tqdm(range(len(intervals)), desc="Processing FRFs", unit="interval"):
+for i in tqdm(range(len(intervals)), desc="Processing FRFs", unit="intervals"):
     interval = intervals[i]
     debug_info = "startrow: " + str(startrow) + ", weight startrow: " + str(weight_startrow)
     data = []

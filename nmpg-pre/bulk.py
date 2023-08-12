@@ -19,7 +19,7 @@ logger.debug("parsed args")
 dirs = os.listdir(args.data)
 dirs.sort()
 
-for i in tqdm(range(len(dirs)), desc="Preprocessing data...", unit="drains"):
+for i in tqdm(range(len(dirs)), desc="Preprocessing data...", unit="drain"):
     os.system("python3 nmpg-pre/nmpg-pre.py \"" + os.path.join(args.data, dirs[i]) + "\" --no-interact " + ("--indent" if args.indent else ""))
     logger.info("Preprocessed drain " + str(i+1) + "/" + str(len(dirs)) + " (" + dirs[i] + ")")
 
