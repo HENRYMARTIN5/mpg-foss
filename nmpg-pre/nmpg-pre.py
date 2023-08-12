@@ -22,6 +22,7 @@ parser.add_argument('data', metavar='data', type=str, help='Path to data (standa
 parser.add_argument('--indent', dest='indent', action='store_true', help='Export JSON with indentation')
 parser.add_argument('--no-interact', dest='interact', action='store_false', help='Disable interactive mode (default: enabled)')
 parser.add_argument('--no-frf', dest='frf', action='store_false', help='Disable FRF calculation for noise reduction (default: enabled)')
+parser.add_argument('--match-method', dest='match_method', type=str, default='fixed', help='Method for matching timestamps (default: fixed) - options: fixed, timestamp-smart')
 args = parser.parse_args()
 logger.debug("parsed args")
 
@@ -120,7 +121,7 @@ first_timestamp = microstrain[0, 0]
 last_timestamp = microstrain[-1, 0]
 logger.debug(f"First timestamp: {first_timestamp}")
 logger.debug(f"Last timestamp: {last_timestamp}")
-intervals = np.arange(parse(first_timestamp), parse(last_timestamp), pd.Timedelta("0.2s"))
+intervals = np.arange(parse(str(first_timestamp)), parse(str(last_timestamp)), pd.Timedelta("0.2s"))
 # cut off last 5 characters of each timestamp to remove milliseconds
 logger.info("Rounding timestamps...")
 intervals = [str(i)[:-5] for i in intervals]
@@ -156,18 +157,28 @@ startrow = 0
 weight_startrow = 0
 for i in tqdm(range(len(intervals)), desc="Processing FRFs", unit="intervals"):
     interval = intervals[i]
-    debug_info = "startrow: " + str(startrow) + ", weight startrow: " + str(weight_startrow)
     data = []
-    num_without_timestamp_match = 0
-    timestamp_threshold = 16000
-    for i in range(startrow, len(microstrain)):
-        if microstrain[i, 0][0:-5].endswith(interval[-10:]):
-            data.append(microstrain[i])
-            startrow = i # speed gets exponentially better with this implemented
-        else:
-            num_without_timestamp_match += 1
-            if num_without_timestamp_match > timestamp_threshold:
+    if args.match_method == "timestamp-smart":
+        num_without_timestamp_match = 0
+        timestamp_threshold = 16000
+        for i in range(startrow, len(microstrain)):
+            if microstrain[i, 0][0:-5].endswith(interval[-10:]):
+                data.append(microstrain[i])
+                startrow = i # speed gets exponentially better with this implemented
+            else:
+                num_without_timestamp_match += 1
+                if num_without_timestamp_match > timestamp_threshold:
+                    break
+    elif args.match_method == "fixed":
+        fixed_interval = 19320
+        timestep = 0.2
+        step = int(fixed_interval * timestep)
+        for i in range(startrow, startrow + step):
+            try:
+                data.append(microstrain[i])
+            except IndexError:
                 break
+        startrow += step
     # something similar but using the microstrain timestamp to find matches in the weight data
     found_something = False
     curr_interval = interval
