@@ -18,7 +18,7 @@ def space(length: int) -> str:
     return " " * length
 
 parser = argparse.ArgumentParser(description='Data pre-processing script for NMPG/MPG-FOSS')
-parser.add_argument('data', metavar='data', type=str, help='Path to data (standard format: microstrain dir and weight_data.csv)')
+parser.add_argument('data', metavar='data', type=str, help='Path to data (standard format: microstrain dir and weight_data.csv) - wavelength data will be converted to µstrain')
 parser.add_argument('--indent', dest='indent', action='store_true', help='Export JSON with indentation')
 parser.add_argument('--no-interact', dest='interact', action='store_false', help='Disable interactive mode (default: enabled)')
 parser.add_argument('--no-frf', dest='frf', action='store_false', help='Disable FRF calculation for noise reduction (default: enabled)')
@@ -51,7 +51,12 @@ new_data = """Channel 1; Sensor 1; Sensor 2; Sensor 3; Sensor 4; Sensor 5; Senso
 
 receive_ts; packet_ts; seqnr; sync status; TEC status; missed frames; channel; numsens; wavelength 1; wavelength 2; wavelength 3; wavelength 4; wavelength 5; wavelength 6; wavelength 7; wavelength 8
 """
+
+is_microstrain = True
+
 for file in microstrain_files:
+    if "wavelength" in file.lower():
+        is_microstrain = False
     print(f"Merging microstrain file {microstrain_files.index(file)+1}/{len(microstrain_files)}", end="\r")
     with open(os.path.join(microstrain_path, file), "r") as f:
         lines = f.readlines()
@@ -73,6 +78,24 @@ microstrain = pd.read_csv(new_microstrain, delimiter=';', skiprows=3, parse_date
 logger.info("Loading weight data...")
 weight = pd.read_csv(weight_path, delimiter=',', header=None, skiprows=1).values
 logger.info("Data loaded.")
+
+if not is_microstrain:
+    logger.info("Converting wavelength data to µstrain...")
+    # grab last 8 columns of wavelength data
+    wavelength = microstrain[:, -8:]
+    tracks = []
+    microstrain_tracks = []
+    for i in range(0,7):
+        tracks.append(wavelength[:, i])
+    for track in tracks:
+        track = np.array(track, dtype=np.float64)
+        track = track.reshape((len(track), 1))
+        normalized_track = ((track[:, 0] - track[0, 0]) / track[0, 0]) * (1 / (1 - 0.22)) * 10**6 # magic formula for conversion - even I don't know how it works
+        microstrain_tracks.append(normalized_track)
+    microstrain_tracks = np.array(microstrain_tracks)
+    # place the data back into the original array
+    for i in range(0,7):
+        microstrain[:, i+8] = microstrain_tracks[i]
 
 logger.info("Converting timestamps...")
 logger.debug("Calculating length...")
