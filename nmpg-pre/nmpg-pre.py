@@ -21,6 +21,7 @@ parser = argparse.ArgumentParser(description='Data pre-processing script for NMP
 parser.add_argument('data', metavar='data', type=str, help='Path to data (standard format: microstrain dir and weight_data.csv)')
 parser.add_argument('--indent', dest='indent', action='store_true', help='Export JSON with indentation')
 parser.add_argument('--no-interact', dest='interact', action='store_false', help='Disable interactive mode (default: enabled)')
+parser.add_argument('--no-frf', dest='frf', action='store_false', help='Disable FRF calculation for noise reduction (default: enabled)')
 args = parser.parse_args()
 logger.debug("parsed args")
 
@@ -130,14 +131,20 @@ else:
 logger.info("Starting FRF processing...")
 startrow = 0
 weight_startrow = 0
-for i in tqdm(range(len(intervals)), desc="Processing FRFs", unit="intervals"):
+for i in tqdm(range(len(intervals)), desc="Processing FRFs", unit="interval"):
     interval = intervals[i]
     debug_info = "startrow: " + str(startrow) + ", weight startrow: " + str(weight_startrow)
     data = []
+    num_without_timestamp_match = 0
+    timestamp_threshold = 16000
     for i in range(startrow, len(microstrain)):
         if microstrain[i, 0][0:-5].endswith(interval[-10:]):
             data.append(microstrain[i])
             startrow = i # speed gets exponentially better with this implemented
+        else:
+            num_without_timestamp_match += 1
+            if num_without_timestamp_match > timestamp_threshold:
+                break
     # something similar but using the microstrain timestamp to find matches in the weight data
     found_something = False
     curr_interval = interval
@@ -156,7 +163,7 @@ for i in tqdm(range(len(intervals)), desc="Processing FRFs", unit="intervals"):
             found_something = True
             break
         if tries > maxtries:
-            # logger.warn("!!! No weight data for interval " + interval + " !!!")
+            logger.debug("!!! No weight data for interval " + interval + " !!!")
             break
         # try incrementing the interval by 0.1s
         curr_interval = str(parse(curr_interval) + pd.Timedelta("0.1s"))
@@ -183,8 +190,11 @@ for i in tqdm(range(len(intervals)), desc="Processing FRFs", unit="intervals"):
     frf_x = np.array(frf_x)
     frf_y = np.array(frf_y)
     try:
-        result = frf(frf_x, frf_y)
-    except ValueError:
+        if args.frf:
+            result = frf(frf_x, frf_y)
+        else:
+            result = np.fft.fft(frf_x)
+    except ValueError as e:
         result = np.array([0.0])
     frfs.append([interval, result, weight_avg])
 
