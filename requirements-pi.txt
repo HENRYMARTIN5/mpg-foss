@@ -10,3 +10,4 @@ halo
 GitPython
 python-dateutil
 tqdm
+bitarray
