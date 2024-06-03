@@ -4,12 +4,15 @@ import sys
 import threading
 import pandas as pd
 import datetime
+import sys
+import traceback
+import re
 
 debug = True
-generateFakeData = True
+generateFakeData = False
 
 if not generateFakeData:
-    dev = usb.core.find(idVendor=0x1a86,idProduct=0x7523)
+    dev = usb.core.find(idVendor=0x1a86, idProduct=0x7523)
     if dev is None:
         raise Exception("Plug in the scale!")
     assert dev is not None
@@ -18,12 +21,12 @@ if not generateFakeData:
 
     dev.reset()
 
-
-    if dev.is_kernel_driver_active(i):
-        try:
-            dev.detach_kernel_driver(i)
-        except usb.core.USBError as e:
-            raise Exception("Failed to detatch kernel driver: %s" % str(e))
+    if not sys.platform.startswith('win'):
+        if dev.is_kernel_driver_active(i):
+            try:
+                dev.detach_kernel_driver(i)
+            except usb.core.USBError as e:
+                raise Exception("Failed to detatch kernel driver: %s" % str(e))
     
 data = pd.DataFrame(columns=["weight", "time", "matlab_time"])
     
@@ -33,43 +36,31 @@ if not generateFakeData:
 
 current_weight = 0.0
 
-charmap = {
-    46:  '.',
-    48:  '0',
-    177: '1',
-    178: '2',
-    51:  '3',
-    180: '4',
-    53:  '5',
-    54:  '6',
-    183: '7',
-    184: '8',
-    57:  '9',
-}
-
 start_seconds = datetime.datetime.now().timestamp()
 fake_threshold = None
 
 def decodeThread(r):
     global current_weight
-    r = r[:-4]
-    decoded = ""
-    for i in r:
-        if i in charmap:
-            decoded += charmap[i]
-        else:
-            return # invalid data, just wait for a second to get more
-    print(decoded, end=" "*30 + "\r")
+    r = bytearray(r)
+    r = r.decode("ascii").replace(" ", "").replace("\n", "").replace("\r", "")
+    if len(r) < 6:
+        return
+    pattern = re.compile(r'\b\d{1,3}\.\d{2}(?:lb|l)\b')
+    matches = pattern.findall(r)
+    if len(matches) == 0:
+        return
+    weight = matches[0].replace('l', '').replace('b', '')
     try:
-        current_weight = float(decoded)
+        current_weight = float(weight)
+        print("Weight: %slb" % current_weight)
         data.loc[len(data)] = [current_weight, pd.Timestamp.now(), datetime.datetime.now().timestamp() - start_seconds]
     except ValueError:
-        print(decoded + " (invalid!)", end="\r")
+        traceback.print_exc()
 
 while True:
     try:
         if not generateFakeData:
-            r = dev.read(eaddr, 10)
+            r = dev.read(eaddr, 10, timeout=1000)
             t = threading.Thread(target=decodeThread, args=(r,))
             t.start()
         else:

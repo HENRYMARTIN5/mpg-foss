@@ -4,9 +4,9 @@ import os
 
 def clear():
     if os.name == "posix":
-        subprocess.run(["clear"])
+        os.system("clear")
     else:
-        subprocess.run(["cls"])
+        os.system("cls")
 
 while True:
 
