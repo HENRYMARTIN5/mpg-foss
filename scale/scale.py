@@ -41,10 +41,12 @@ fake_threshold = None
 
 def decodeThread(r):
     global current_weight
-    r = bytearray(r)
-    r = r.decode("ascii").replace(" ", "").replace("\n", "").replace("\r", "")
-    if len(r) < 6:
+    if len(r) < 11 or len(r) > 13:
         return
+    r = bytearray(r)
+    print(r)
+    r = r.decode("ascii", errors="ignore").replace(" ", "space").replace("\n", "newline").replace("\r", "return")
+    print(r)
     pattern = re.compile(r'\b\d{1,3}\.\d{2}(?:lb|l)\b')
     matches = pattern.findall(r)
     if len(matches) == 0:
@@ -60,7 +62,7 @@ def decodeThread(r):
 while True:
     try:
         if not generateFakeData:
-            r = dev.read(eaddr, 10, timeout=1000)
+            r = dev.read(eaddr, 128, timeout=1000)
             t = threading.Thread(target=decodeThread, args=(r,))
             t.start()
         else:
