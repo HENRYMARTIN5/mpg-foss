@@ -170,3 +170,6 @@ stripped/
 .vscode/
 .vscode-server/
 .history/
+
+# local debugging scripts
+*.bat

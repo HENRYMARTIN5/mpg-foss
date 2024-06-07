@@ -1,50 +1,36 @@
-"""
-fossrec.py: Record a complete FOSS drain, including weight data and wavelength data.
-
-Requires the PhotonFirst Gator Python API to be installed. See the MPG-FOSS shared drive for a copy.
-
-Also requires the scale to be configured with the correct drivers. Download and run Zadig and select libusbK or WinUSB for the scale (which shows up as "USB Serial" in the dropdown).
-
-On the scale, set the following configuration options:
-User -> COM2 -> Layout -> LFUULF
-User -> COM2 -> Byte fmt -> 8N1
-User -> COM2 -> Baudrt -> 9600
-"""
 
 # region Globals
-BUCKET_WEIGHT = 1.80 # lbs
-USE_TARE = False # set to True if you haven't already tared the scale
+BUCKET_WEIGHT = 1.80  # lbs
+USE_TARE = False      # set to True if you haven't already tared the scale
+DEFAULT_PORT = "COM7" # default port for the scale - if this isn't found, the script will ask for a port
+LOG_SCALE = True      # log scale data to console
+LOG_GATOR = False     # log gator data to console
+CHECK_ADMIN = False
+SKIP_GATOR_CHECK = True # for faster debugging
 # endregion
 
-# region Initialization
-print("Loading modules...")
 from photonfirst.gator_api import GatorApi
-import usb.core
-import usb.util
-import sys
+import serial
+from serial.tools import list_ports
+import string
 import threading
-import pandas as pd
-import datetime
-import sys
-import traceback
 import re
+import datetime
+import pandas as pd
+
+def cog_int_to_wavelength(val: int) -> float:
+    return 1514+((val * (1586-1514))/(2 ** 18)) # magic formula from the gator datasheet
 
 print("Initializing scale...")
-dev = usb.core.find(idVendor=0x1a86, idProduct=0x7523)
-if dev is None:
-    raise Exception("Plug in the scale before running this script.")
-assert dev is not None
-ep = dev[0].interfaces()[0].endpoints()[0]
-i = dev[0].interfaces()[0].bInterfaceNumber
-dev.reset()
-if not sys.platform.startswith('win'):
-    if dev.is_kernel_driver_active(i):
-        try:
-            dev.detach_kernel_driver(i)
-        except usb.core.USBError as e:
-            raise Exception("Failed to detatch kernel driver: %s" % str(e))
-dev.set_configuration()
-eaddr = ep.bEndpointAddress
+print("Available ports:")
+for port in list_ports.comports():
+    print("\t" + port.device)
+if not DEFAULT_PORT in [port.device for port in list_ports.comports()]:
+    print(f"Default port {DEFAULT_PORT} not found. What port should we use?")
+    DEFAULT_PORT = input(" -> ")
+print(f"Opening serial port {DEFAULT_PORT}...")
+ser = serial.Serial(DEFAULT_PORT, 9600, timeout=1)
+print("Serial port opened.")
 
 print("Initializing Gator...")
 api = GatorApi()
@@ -53,88 +39,120 @@ try:
 except IndexError:
     raise Exception("Plug in the Gator and **TURN IT ON** before running this script.")
 assert gator is not None
-print("Fetching settings from Gator to make sure it's alive...")
-settings = {
-    "f Factor": gator.get_ffactor(),
-    "COG Threshold": gator.get_cogthreshold(),
-    "Sample freq.": gator.get_samplefrequency()
-}
-print("Found Gator! Settings:")
-for k, v in settings.items():
-    print(f"  {k}: {v}")
-# endregion
+if not SKIP_GATOR_CHECK:
+    print("Fetching settings from Gator to make sure it's alive...")
+    settings = {
+        "f Factor": gator.get_ffactor(),
+        "COG Threshold": gator.get_cogthreshold(),
+        "Sample freq.": gator.get_samplefrequency()
+    }
+    print("Found Gator! Settings:")
+    for k, v in settings.items():
+        print(f"  {k}: {v}")
 
-print("Creating dataframe...")
-data = pd.DataFrame(columns=["elapsed_time", "timestamp", "weight"], index=None)
+def convert_sample_to_wavelength(sample):
+    return {
+        "Sensor 1": cog_int_to_wavelength(sample["Sensor 1"]),
+        "Sensor 2": cog_int_to_wavelength(sample["Sensor 2"]),
+        "Sensor 3": cog_int_to_wavelength(sample["Sensor 3"]),
+        "Sensor 4": cog_int_to_wavelength(sample["Sensor 4"]),
+        "Sensor 5": cog_int_to_wavelength(sample["Sensor 5"]),
+        "Sensor 6": cog_int_to_wavelength(sample["Sensor 6"]),
+        "Sensor 7": cog_int_to_wavelength(sample["Sensor 7"]),
+        "Sensor 8": cog_int_to_wavelength(sample["Sensor 8"])
+    }
+
+# HACK: extra charmap to fix the encoding issues with the scale
+extra_charmap = {
+    b"\xa0": b"\x20", # space
+    b"\xb0": b"\x30", # 0
+    b"\xb1": b"\x31", # 1
+    b"\xb2": b"\x32", # 2
+    b"\xb3": b"\x33", # 3
+    b"\xb4": b"\x34", # 4
+    b"\xb5": b"\x35", # 5
+    b"\xb6": b"\x36", # 6
+    b"\xb7": b"\x37", # 7
+    b"\xb8": b"\x38", # 8
+    b"\xb9": b"\x39", # 9
+}
+
 current_weight = 0.0
-start_seconds = datetime.datetime.now().timestamp()
+buffer = ""
+pattern = re.compile(r'\d{1,3}\.\d{2}(?:lb|l)') # compile once, better performance - why wasn't I doing this before??
 thread_running = True
 thread_initialized = False
+start_seconds = datetime.datetime.now().timestamp()
 
-charmap = {
-    0x18: '0',
-    0x9e: '.'
-}
-
-def str_decode(r):
-    res = ""
-    for byte in r:
-        if byte in charmap:
-            res += charmap[byte]
-        else:
-            res += "?"
-
-# region Threads and Handlers
-def decode(r) -> float:
-    global current_weight, thread_initialized
-    r = bytearray(r)
-    # HACK: lazy and stupid, but it works
-    r = r.decode("ascii").replace(" ", "").replace("\n", "").replace("\r", "")
-    if len(r) < 6:
-        return None
-    pattern = re.compile(r'\b\d{1,3}\.\d{2}(?:lb|l)\b')
-    matches = pattern.findall(r)
-    if len(matches) == 0:
-        return None
-    weight = matches[0].replace('l', '').replace('b', '')
-    try:
-        current_weight = float(weight) if not USE_TARE else float(weight) - BUCKET_WEIGHT
-        print("Weight: %slb" % current_weight)
-        thread_initialized = True # signal that data is being received and the Gator stream can start
-        return current_weight
-    except ValueError:
-        traceback.print_exc()
-        return None
-
-def scale_thread():
-    global thread_running
-    while thread_running:
-        try:
-            decode(dev.read(eaddr, 10, timeout=1000))
-        except usb.core.USBError as e:
-            traceback.print_exc()
+f = open("fossrec.csv", "w")
+f.write("elapsed_time,weight,wavelength 1,wavelength 2,wavelength 3,wavelength 4,wavelength 5,wavelength 6,wavelength 7,wavelength 8\n")
 
 def gator_stream(sample):
-    global thread_initialized
-    if not thread_initialized:
-        return # wait for the scale thread to start so we don't get desynced
-    print(sample) # TODO: add sample data to the dataframe
-    data.loc[len(data)] = [datetime.datetime.now().timestamp() - start_seconds, pd.Timestamp.now(), current_weight]
-# endregion
+    global collected_data, current_weight
+    sample = convert_sample_to_wavelength(sample)
+    if LOG_GATOR:
+        print(sample)
+    frame = [datetime.datetime.now().timestamp() - start_seconds, current_weight, *convert_sample_to_wavelength(sample).values()]
+    f.write(",".join(map(str, frame)) + "\n")
 
-# region Main
-scale_thread = threading.Thread(target=scale_thread)
-print("Trying to open Gator data stream...")
-gator_stream = gator.start_measurement_datastream(gator_stream)
-print("Starting scale thread...")
-scale_thread.start()
-input("Press ENTER at any point to stop recording.")
-print("Stopping Gator data stream...")
-gator.stop_measurement_datastream()
-print("Stopping scale thread...")
-thread_running = False
-scale_thread.join()
+def decode_ascii_with_extra(data: bytes) -> str:
+    # HACK: really stupid way to layer the extra encoding... but it works and minimizes the error rate
+    dot_point = data.find(b".")
+    if dot_point < 3:
+        return ""
+    for char in extra_charmap:
+        data = data.replace(char, extra_charmap[char])
+    return data.decode("ascii", errors="ignore")
+
+def filter_printable(s):
+    return ''.join(filter(lambda x: x in string.printable, s))
+
+def remove_all(s, chars):
+    for c in chars:
+        s = s.replace(c, "")
+    return s
+
+def read_scale() -> float:
+    global current_weight, thread_t, thread_initialized, buffer
+    r = ser.read_all()
+    decoded = filter_printable(decode_ascii_with_extra(r))
+    if decoded.strip() != "":
+        buffer += decoded
+        buffer = remove_all(buffer, "\r\n")
+        matches = pattern.findall(buffer)
+        if len(matches) > 0:
+            buffer = ""
+            weight = float(remove_all(matches[0], "lb"))
+            current_weight = weight
+            thread_initialized = True
+            if LOG_SCALE:
+                print(f"-> {'{:6.2f}'.format(weight)}lb")
+            return weight
+    return current_weight
+
+running = True
+def scale_thread():
+    global running
+    while running:
+        try:
+            read_scale()
+        except Exception as e:
+            print("Error in scale thread:", e)
+
+gator.start_measurement_datastream(gator_stream)
+t = threading.Thread(target=scale_thread)
+t.start()
+print("Measurement datastream started. Press Ctrl+C or Enter to stop.")
+try:
+    input()
+except KeyboardInterrupt:
+    gator.stop_measurement_datastream()
+    running = False
+    t.join()
+    print("Measurement datastream stopped.")
 print("Saving CSV...")
-data.to_csv(f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_fossrec.csv")
-print("Done!")
-# endregion
+f.close()
+running = False
+print("CSV saved.")
+print("If the program isn't exiting properly, it is now safe to kill it.")
+exit(0)

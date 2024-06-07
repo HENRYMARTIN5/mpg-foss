@@ -12,3 +12,5 @@ GitPython
 python-dateutil
 tqdm
 bitarray
+pyuac
+pypiwin32
