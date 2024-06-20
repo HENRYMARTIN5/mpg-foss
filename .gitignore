@@ -173,3 +173,5 @@ stripped/
 
 # local debugging scripts
 *.bat
+
+env3.8
