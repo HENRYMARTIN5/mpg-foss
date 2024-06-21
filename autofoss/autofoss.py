@@ -17,6 +17,30 @@ import power
 import refill
 from csv_util import write_csv
 import argparse
+import traceback
+
+def do_refill(components: dict):
+    print('Refilling tank...')
+    components['power'].off(3)
+    components['refill'].start()
+    res = components['refill'].wait_for_refill()
+    if not res:
+        print("Refill failed! Pausing for human intervention. Press ENTER to continue.")
+        input()
+    print('Tank refilled.')
+    try:
+        print('Resetting components...')
+        try:
+            components['power'].stop()
+        except ValueError:
+            pass
+        components['gator'].reset()
+        components['scale'].reset()
+    except Exception as e:
+        print("Error resetting components:", e)
+        traceback.print_exc()
+        components['scale'].stop()
+        components['power'].stop()
 
 def main() -> int:
     """
@@ -30,13 +54,29 @@ Procedure for use:
 4. You can stop the script at the next cycle gracefully by pressing CTRL+C. If you want to stop the script immediately, press CTRL+C a second time.
     """
     parser = argparse.ArgumentParser(description="AutoFOSS - 100% automated FOSS data collection", epilog=main.__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--scale-port", help="COM port for the scale", default="COM7")
-    parser.add_argument("--power-port", help="COM port for the power supply", default="COM9")
-    parser.add_argument("--no-log-scale", help="Don't log scale data to console", action="store_false")
-    parser.add_argument("--log-gator", help="Log Gator data to console (warning: absolutely murders performance!)", action="store_true")
+    parser.add_argument("-s", "--scale-port", help="COM port for the scale", default="COM7")
+    parser.add_argument("-p", "--power-port", help="COM port for the power supply", default="COM9")
+    parser.add_argument("-S", "--no-log-scale", help="Don't log scale data to console", action="store_true")
+    parser.add_argument("-g", "--log-gator", help="Log Gator data to console (warning: absolutely murders performance!)", action="store_true")
     parser.add_argument("--weight-timeout", help="Time in seconds before considering the tank drained", type=int, default=8)
-    parser.add_argument("--bucket-weight", help="Weight of the bucket when empty (with a bit of wiggle room) in lbs", type=float, default=3.65) # NOTE: this is with the 1kg weight inside the bucket to hold down the pump hose, which is a stupid solution
+    parser.add_argument("-b", "--bucket-weight", help="Weight of the bucket when empty (with a bit of wiggle room) in lbs", type=float, default=1.0)
+    parser.add_argument("--pump-extra-runtime", help="How long to run the pump for (in seconds) additionally after the refill threshold is reached", type=float, default=5.0)
+    parser.add_argument("-f", "--refill-first", help="Immediately jump to refilling the tank at the start of the script's cycle", action="store_true")
+    parser.add_argument("-r", "--refill", help="Just refill the tank and exit", action="store_true")
+    parser.add_argument("-o", "--out-dir", help="Output directory for CSV files", default="drains")
+    parser.add_argument("--full-tank-weight", help="Weight of the tank when full in lbs", type=float, default=15.45)
     args = parser.parse_args()
+
+    if args.refill:
+        components = {}
+        components['power'] = power.AutofossPowersupply(components, address=args.power_port)
+        components['scale'] = scale.AutofossScale(components, log_scale=not args.no_log_scale, default_port=args.scale_port, weight_timeout=args.weight_timeout, full_weight=args.full_tank_weight)
+        components['gator'] = gator.AutofossGator(components, auto_end=True, log_gator=args.log_gator)
+        components['refill'] = refill.AutofossRefiller(components, threshold=args.bucket_weight, extra=args.pump_extra_runtime)
+        components['power'].start()
+        components['scale'].start()
+        do_refill(components)
+        return 0
 
     if args.log_gator:
         print("WARNING: Don't be an idiot and read this!")
@@ -46,55 +86,55 @@ Procedure for use:
         if yn.lower() != 'y':
             return 1
 
+    ########### Place your components here! ###########
     components = {}
-    components['scale'] = scale.AutofossScale(components, log_scale=not args.no_log_scale, default_port=args.scale_port)
-    components['gator'] = gator.AutofossGator(components, auto_end=True, log_gator=args.log_gator)
     components['power'] = power.AutofossPowersupply(components, address=args.power_port) # NOTE: no start() or stop() methods
-    components['refill'] = refill.AutofossRefiller(components, threshold=args.bucket_weight)
+    components['scale'] = scale.AutofossScale(components, log_scale=not args.no_log_scale, default_port=args.scale_port, weight_timeout=args.weight_timeout)
+    components['gator'] = gator.AutofossGator(components, auto_end=True, log_gator=args.log_gator)
+    components['refill'] = refill.AutofossRefiller(components, threshold=args.bucket_weight, extra=args.pump_extra_runtime)
 
     running = True
-    interrupted = False
     force_shutdown = False
+    jump_refill = args.refill_first
     while running:
-        if not interrupted:
-            components['gator'].start()
-            components['scale'].start()
-        try:
-            while components['scale'].thread_running:
-                pass
-        except KeyboardInterrupt:
-            print("Interrupted!")
-            if not interrupted:
-                print("Press CTRL+C again to force shutdown. This script will sto gracefully after this drain.")
-                interrupted = True
-                continue
-            print("Forcing shutdown...")
-            force_shutdown = True
+        components['power'].start()
+
+        if jump_refill:
+            do_refill(components)
+            jump_refill = False
+            continue
+
+        components['gator'].start()
+        components['scale'].start()
+
+        stop_next, force_shutdown = components['scale'].wait_for_thread()
+
         print("Shutting down...")
         components['gator'].stop()
         components['scale'].stop()
         if force_shutdown:
-            components['power'].stop()
-            return 128 # SIGINT
+            components['power'].stop()        
         print('Everything is off. Writing samples to CSV...')
-        file_name = write_csv(components['gator'].samples)
+        file_name = write_csv(components['gator'].samples, out_folder=args.out_dir)
         print(f'CSV file written: {file_name}')
-        if not interrupted:
-            print('Refilling tank...')
-            components['refill'].start()
-            res = components['refill'].wait_for_refill()
-            if not res:
-                print("Refill failed! Pausing for human intervention. Press ENTER to continue.")
-                input()
-            print('Tank refilled.')
-            print('Resetting components...')
+        if force_shutdown:
+            return 128 # SIGINT
+
+        if stop_next:
+            print('Gracefully stopping.')
             for component in components.values():
-                components[component].reset()
-            print('And now, again!')
-        else:
-            running = False
-            break # really neccesary? probably not
+                component.stop()
+            return 0
+
+        do_refill(components)
+        print('And now, again!')
     return 0
 
 if __name__ == '__main__':
-    exit(main())
+    try:
+        exit(main())
+    except SystemExit:
+        pass
+    except:
+        traceback.print_exc()
+        exit(1)

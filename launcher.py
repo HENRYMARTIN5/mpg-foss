@@ -1,6 +1,7 @@
 #!/usr/env python3
 import subprocess
 import os
+import sys
 
 def clear():
     if os.name == "posix":
@@ -17,20 +18,20 @@ while True:
     print("4. Exit")
     choice = input(" > ")
     if choice == "1":
-        inp = input("Input file (csv) > ")
-        out = input("Output file (csv) > ")
-        subprocess.run(["python3", "fossfft/fossfft.py", inp, out])
+        yn = input("Add launch options? [y/N] ")
+        if yn.lower() == "y":
+            options = input("Options > ")
+            subprocess.run([sys.executable, "autofoss/autofoss.py", options])
+        else:
+            subprocess.run([sys.executable, "autofoss/autofoss.py"])
     elif choice == "2":
         # check to make sure user is running ubuntu
         print("Checking OS...")
         forcecontinue = False
         if os.name != "posix":
-            print("Dependency installation is only supported on Ubuntu 20.04 LTS or Raspberry Pi OS.")
-            inp = input("Continue anyway? (y/n) > ")
-            if inp == "y":
-                forcecontinue = True
-            else:
-                continue
+            print("Installing pip dependencies...")
+            subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+            continue
         _os = subprocess.run(["lsb_release", "-d"], capture_output=True).stdout.decode("utf-8")
         if not forcecontinue:
             if "Ubuntu" not in _os or "Raspbian" not in _os:

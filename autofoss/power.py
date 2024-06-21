@@ -1,4 +1,4 @@
-from common import AutofossComponent
+from component import AutofossComponent
 from msl.equipment import (
     EquipmentRecord,
     ConnectionRecord,
@@ -16,10 +16,10 @@ class AutofossPowersupply(AutofossComponent):
                 timeout=10,
             )
         )
-        self.tti = self.record.connect()
+        self.channels = [1, 2, 3]
     
     def start(self):
-        raise NotImplementedError("Don't call this method directly - this component should be started by the AutofossGator component.")
+        self.tti = self.record.connect()
 
     def stop(self):
         """Turns off all power supply channels. You probably don't want to call this."""
@@ -28,19 +28,19 @@ class AutofossPowersupply(AutofossComponent):
         self.tti.turn_off(3)
         self.tti.disconnect()
     
-    def on(self, channel: int):
+    def on(self, channel):
+        if type(channel) != int:
+            for _channel in channel:
+                self.tti.turn_on(_channel)
+            return
         self.tti.turn_on(channel)
     
-    def off(self, channel: int):
+    def off(self, channel):
+        if type(channel) != int:
+            for _channel in channel:
+                self.tti.turn_off(_channel)
+            return
         self.tti.turn_off(channel)
-    
-    def on(self, channels: list):
-        for channel in channels:
-            self.tti.turn_on(channel)
-    
-    def off(self, channels: list):
-        for channel in channels:
-            self.tti.turn_off(channel)
     
     def reset(self):
         self.stop()
