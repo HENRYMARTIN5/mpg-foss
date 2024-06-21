@@ -1,3 +1,4 @@
+# region Docstring
 """
 Script to automatically take full recordings of drains. Logs data from the Gator and scale to a CSV file and automatically enables noise generation and the valve with the MX100TP.
 
@@ -11,6 +12,7 @@ Procedure:
 4. You can stop the script at the next cycle gracefully by pressing CTRL+C. If you want to stop the script immediately, press CTRL+C a second time.
 """
 
+# region Gator API installatino
 try:
     from gator_api.gator_api import GatorApi
 except ImportError:
@@ -22,10 +24,11 @@ except ImportError:
         os.system("pip install ../gator_api-1.0.0-py3-none-any.whl")
     else:
         print("Error: Gator API not found. The latest version of the Gator API can be found in the Python API folder of the MPG-FOSS Google Drive. \
-          As this API is strictly proprietary, it cannot be included in this repository. Please download the whl file and place it at the root of the mpg-foss repo, \
-          and it will be automatically installed the next time you run this script.")
+As this API is strictly proprietary, it cannot be included in this repository. Please download the whl file and place it at the root of the mpg-foss repo, \
+and it will be automatically installed the next time you run this script.")
         exit(1)
 
+# region API initialization
 import scale
 import gator
 import power
@@ -34,6 +37,7 @@ from csv_util import write_csv
 import argparse
 import traceback
 
+# region Refill
 def do_refill(components: dict):
     print('Refilling tank...')
     components['power'].off(3)
@@ -57,6 +61,7 @@ def do_refill(components: dict):
         components['scale'].stop()
         components['power'].stop()
 
+# region Main docstring
 def main() -> int:
     """
 Make sure the scale is at factory defaults, except for:
@@ -68,6 +73,8 @@ Procedure for use:
 3. This script will automatically start everything neccesary to record data, and will refill the tank as needed. You shouldn't need to do anything.
 4. You can stop the script at the next cycle gracefully by pressing CTRL+C. If you want to stop the script immediately, press CTRL+C a second time.
     """
+
+    # region Argument parsing
     parser = argparse.ArgumentParser(description="AutoFOSS - 100% automated FOSS data collection", epilog=main.__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-s", "--scale-port", help="COM port for the scale", default="COM7")
     parser.add_argument("-p", "--power-port", help="COM port for the power supply", default="COM9")
@@ -82,6 +89,7 @@ Procedure for use:
     parser.add_argument("--full-tank-weight", help="Weight of the tank when full in lbs", type=float, default=15.45)
     args = parser.parse_args()
 
+    # region Immediate arguments
     if args.refill:
         components = {}
         components['power'] = power.AutofossPowersupply(components, address=args.power_port)
@@ -101,6 +109,7 @@ Procedure for use:
         if yn.lower() != 'y':
             return 1
 
+    # region Component initialization
     ########### Place your components here! ###########
     components = {}
     components['power'] = power.AutofossPowersupply(components, address=args.power_port) # NOTE: no start() or stop() methods
@@ -108,6 +117,7 @@ Procedure for use:
     components['gator'] = gator.AutofossGator(components, auto_end=True, log_gator=args.log_gator)
     components['refill'] = refill.AutofossRefiller(components, threshold=args.bucket_weight, extra=args.pump_extra_runtime)
 
+    # region Main loop
     running = True
     force_shutdown = False
     jump_refill = args.refill_first
@@ -145,6 +155,7 @@ Procedure for use:
         print('And now, again!')
     return 0
 
+# region Entry
 if __name__ == '__main__':
     try:
         exit(main())
