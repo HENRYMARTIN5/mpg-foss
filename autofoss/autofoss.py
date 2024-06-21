@@ -11,6 +11,21 @@ Procedure:
 4. You can stop the script at the next cycle gracefully by pressing CTRL+C. If you want to stop the script immediately, press CTRL+C a second time.
 """
 
+try:
+    from gator_api.gator_api import GatorApi
+except ImportError:
+    import os
+    print("Gator API not found. Attempting to install...")
+    if os.path.exists("gator_api-1.0.0-py3-none-any.whl"):
+        os.system("pip install gator_api-1.0.0-py3-none-any.whl")
+    elif os.path.exists("../gator_api-1.0.0-py3-none-any.whl"):
+        os.system("pip install ../gator_api-1.0.0-py3-none-any.whl")
+    else:
+        print("Error: Gator API not found. The latest version of the Gator API can be found in the Python API folder of the MPG-FOSS Google Drive. \
+          As this API is strictly proprietary, it cannot be included in this repository. Please download the whl file and place it at the root of the mpg-foss repo, \
+          and it will be automatically installed the next time you run this script.")
+        exit(1)
+
 import scale
 import gator
 import power
