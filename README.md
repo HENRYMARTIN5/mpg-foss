@@ -16,25 +16,26 @@ Contains code for various utilities related to Modal Propellant Gauging via a Fi
 1. Clone the repo: `git clone https://github.com/HENRYMARTIN5/mpg-foss.git`
 2. cd into the repo: `cd mpg-foss`
 3. Create a venv: `python -m venv env`, then activate it: `source env/bin/activate` on *nix or `env\Scripts\activate` on Windows
-3. Open the launcher: `python launcher.py`
-4. Install the dependencies from the menu. If you're on a Raspberry Pi, you can ignore the warnings about distro compatibility.
-5. Profit?
+4. Open the launcher: `python launcher.py`
+5. Install the dependencies from the menu. If you're on a Raspberry Pi, you can ignore the warnings about distro compatibility.
+6. Profit?
 
 ## Utilities
 
-> ![WARNING]
+> [!WARNING]
 > Frankly, the launcher is terrible - you should just run each of these from the command-line. The launcher is only there for people who don't know how to use a command-line interface, which *shouldn't* be you if you're working on this project.
 
-> ![NOTE]
+> [!NOTE]
 > Other older tools are still available in `old/`, but are generally not supported and may not work.
 
 ### AutoFOSS
 
-The 100% automated FOSS data collection and analysis tool. 
+The 100% automated FOSS data collection and analysis tool.
 
 To run: `python autofoss/autofoss.py`
 
 Help:
+
 ```plaintext
 usage: autofoss.py [-h] [-s SCALE_PORT] [-p POWER_PORT] [-S] [-g] [--weight-timeout WEIGHT_TIMEOUT] [-b BUCKET_WEIGHT] [--pump-extra-runtime PUMP_EXTRA_RUNTIME] [-f] [-r] [-o OUT_DIR]
 
