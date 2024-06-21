@@ -16,3 +16,4 @@ pyuac
 pypiwin32
 https://github.com/MSLNZ/msl-equipment/releases/download/v0.1.0/msl_equipment-0.1.0-py2.py3-none-any.whl
 tqdm
+customtkinter

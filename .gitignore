@@ -175,3 +175,6 @@ stripped/
 *.bat
 
 env3.8
+
+# gator stuff
+gatorapi/

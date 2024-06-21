@@ -9,50 +9,18 @@ def clear():
         os.system("cls")
 
 while True:
-
     clear()
     print("MPG-FOSS Util Launcher")
-    print("1. FOSS FFT (calcualte the FFT of a recording, either microstrain or wavelength - deprecated, use FOSS Grapher instead)")
-    print("2. FOSS Grapher (graph a recording or FFT with matplotlib)")
-    print("3. FOSS Realtime Viewer (live data viewing, graphing WIP)")
-    print("4. FOSS Recorder (fetch data from a gator)")
-    print("5. CoG Value Calculator (convert between CoG and wavelength/microstrain)")
-    print("6. Data Converter (get a csv from unofficial to official format)")
-    print("7. Install dependencies")
-    print("8. Update Repo")
-    print("9. Exit")
-
+    print("1. AutoFOSS")
+    print("2. Install dependencies")
+    print("3. Update Repo")
+    print("4. Exit")
     choice = input(" > ")
-
     if choice == "1":
         inp = input("Input file (csv) > ")
         out = input("Output file (csv) > ")
         subprocess.run(["python3", "fossfft/fossfft.py", inp, out])
     elif choice == "2":
-        inp = input("Input file (csv) > ")
-        out = input("Output file (png) > ")
-        useofficial = input("Is the input file in official format? (y/n) > ")
-        if useofficial == "y":
-            useofficial = "fossgrapher/fossgrapher.py"
-        else:
-            useofficial = "fossgrapher/fossgraphermpg.py"
-        usefourier = input("Use FFT? (y/n) > ")
-        if usefourier == "y":
-            usefourier = ""
-        else:
-            usefourier = "-n"
-        subprocess.run(["python3", useofficial, inp, out, usefourier])
-    elif choice == "3":
-        subprocess.run(["python3", "fossrt/fossrt.py"])
-    elif choice == "4":
-        subprocess.run(["sudo", "python3", "fossrt/fossfetch.py"])
-    elif choice == "5":
-        subprocess.run(["python3", "cogcalc/cogcalc.py"])
-    elif choice == "6":
-        inp = input("Input file (csv) > ")
-        out = input("Output file (csv) > ")
-        subprocess.run(["python3", "converter/converter.py", inp, out])
-    elif choice == "7":
         # check to make sure user is running ubuntu
         print("Checking OS...")
         forcecontinue = False
@@ -96,11 +64,7 @@ while True:
                     failed = True
         if failed:
             print("Some packages failed to install. Try installing them manually with python3 -m pip install <package name>.")
-    elif choice == "8":
-        # we double-check here that nothing has been modified locally. if there are unpushed commits, we prompt to push them. if there are uncommitted changes, we prompt to stash, commit, or discard them.
-        # if there are no unpushed commits or uncommitted changes, we just pull.
-        # we also want to make sure that conflicts are taken into account - if there are any, we have to let the user resolve them.
-
+    elif choice == "3":
         # check for unpushed commits
         print("Checking for unpushed commits...")
         unpushed = subprocess.run(["git", "log", "@{u}..", "--oneline"], capture_output=True).stdout.decode("utf-8")
@@ -137,5 +101,5 @@ while True:
         # pull
         print("Pulling...")
         subprocess.run(["git", "pull"])
-    elif choice == "9":
+    elif choice == "4":
         exit(0)
