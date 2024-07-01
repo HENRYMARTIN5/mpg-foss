@@ -40,27 +40,28 @@ def main() -> int:
     df = pd.read_csv(file_path)
     print(df)
     close_loadbox()
-
-    prompt_window = tk.Tk()
-    prompt_window.title("Select Viz Type")
-    prompt_window.geometry("200x100")
-    selected_plotter = None
-    def on_submit():
-        nonlocal selected_plotter
-        selected_plotter = plotters.ALL_PLOTTERS[plot_type_var.get()]
-        prompt_window.quit()
-    tk.Label(prompt_window, text="Select Viz Type").pack()
-    plot_type_var = tk.StringVar(prompt_window)
-    plot_type_var.set("Weight Over Time")
-    tk.OptionMenu(prompt_window, plot_type_var, *plotters.ALL_PLOTTERS.keys()).pack()
-    tk.Button(prompt_window, text="Submit", command=on_submit).pack()
-    prompt_window.mainloop()
-    prompt_window.destroy()
     
-    plotter = selected_plotter(df)
-    plotter.plot()
-    plotter.show()
-    return 0
+    while True:
+        prompt_window = tk.Tk()
+        prompt_window.title("Select Viz Type")
+        prompt_window.geometry("200x100")
+        selected_plotter = None
+        def on_submit():
+            nonlocal selected_plotter
+            selected_plotter = plotters.ALL_PLOTTERS[plot_type_var.get()]
+            prompt_window.quit()
+        tk.Label(prompt_window, text="Select Viz Type").pack()
+        plot_type_var = tk.StringVar(prompt_window)
+        plot_type_var.set("Weight Over Time")
+        tk.OptionMenu(prompt_window, plot_type_var, *plotters.ALL_PLOTTERS.keys()).pack()
+        tk.Button(prompt_window, text="Submit", command=on_submit).pack()
+        tk.Button(prompt_window, text="Cancel", command=exit).pack()
+        prompt_window.mainloop()
+        prompt_window.destroy()
+        
+        plotter = selected_plotter(df)
+        plotter.plot()
+        plotter.show()
 
 if __name__ == "__main__":
     exit(main())

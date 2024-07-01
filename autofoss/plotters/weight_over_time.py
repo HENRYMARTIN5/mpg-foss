@@ -1,4 +1,4 @@
-from .plotter import Plotter
+from .libplotter import Plotter
 import matplotlib.pyplot as plt
 
 class WeightOverTimePlotter(Plotter):
