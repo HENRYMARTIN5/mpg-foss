@@ -67,3 +67,26 @@ optional arguments:
   -o OUT_DIR, --out-dir OUT_DIR
                         Output directory for CSV files
 ```
+
+## Pre-Usage Checklist
+
+1. Take the Gator out of its case and place it near the end of the fiber from the tank.
+2. Take off the cap from the fiber. Leave the cap on the Gator screwed in.
+3. Grab two lint-free wipes, fold them over on top of each other, and moisten them with isopropyl alcohol. Clean the end of the fiber until it appears clear under the fiber microscope.
+4. Unscrew the Gator connector cap, and connect the now-clean fiber to the Gator and screw it in. Make sure to line up the notch correctly.
+5. Connect the Gator to the computer via a USB-B to USB-A cable.
+6. Connect the power supply to the Gator and press the power button in. Make sure that all 8 FBG status lights on the front are illuminated.
+7. Connect the scale to power and verify the settings as described in the Extra Device Config section.
+8. Connect the scale to the computer via an RS-232 to USB cable.
+9. Place a small piece of foam or another prop on one side of the bucket to tilt it slightly in one direction. This will help the water drain out of the bucket more easily when refilling.
+10. Make sure the bucket on the scale is empty, except for the tubing and whatever weight is necessary to keep it in place. Press the zero/tare button on the scale to zero it out.
+11. Make sure the tubing is connected in the following way:
+    - Bucket -> Pump -> Top of Tank
+    - Bottom of Tank -> Valve -> Bucket
+    - Vent on Tank -> Running to a bucket at a higher elevation than the tank
+12. Make sure the tubing is secure and won't come loose during operation.
+13. Connect the power supply to the computer over USB.
+14. Ensure all devices are connected to the power supply.
+15. Turn on the power supply, and verify the voltags are set as described in the Extra Device Config section.
+16. Turn on the high-voltage amplifier (there's a switch on the back right).
+17. Run the script!
