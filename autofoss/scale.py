@@ -86,12 +86,19 @@ class AutofossScale(AutofossComponent):
 
     def thread(self):
         while self.thread_running:
+            gator = self.manager.get('gator')
+            if (datetime.datetime.now() - gator.start_time).total_seconds() > 10:
+                if not gator.last_packet:
+                    print("Gator seems to be disconnected - no packets received in 10 seconds. Stopping...")
+                    self.thread_running = False
+                    self.thread_initialized = False
+                    return
             try:
-                if self.manager.get('gator').auto_end and datetime.datetime.now().timestamp() - self.last_weight_change > self.weight_timeout:
-                        print(f"Tank seems to be drained - no weight changes in {datetime.datetime.now().timestamp() - self.last_weight_change} seconds, over threshold of {self.weight_timeout} seconds. Stopping...")
-                        self.thread_running = False
-                        self.thread_initialized = False
-                        return
+                if gator.auto_end and datetime.datetime.now().timestamp() - self.last_weight_change > self.weight_timeout:
+                    print(f"Tank seems to be drained - no weight changes in {datetime.datetime.now().timestamp() - self.last_weight_change} seconds, over threshold of {self.weight_timeout} seconds. Stopping...")
+                    self.thread_running = False
+                    self.thread_initialized = False
+                    return
                 self.read_scale()
             except Exception as e:
                 print("Error in scale thread:", e)
