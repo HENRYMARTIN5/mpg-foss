@@ -77,3 +77,9 @@ class AutofossRefiller(AutofossComponent):
             if i % 100 == 0:
                 print(f"Refilling tank... currently at {weight}lbs, {'{0:.2f}'.format(self.refill_progress)}% full")
         print("Tank refilled.")
+        
+    def pause(self):
+        pass
+    
+    def resume(self):
+        pass

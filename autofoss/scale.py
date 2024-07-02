@@ -132,3 +132,9 @@ class AutofossScale(AutofossComponent):
             except KeyboardInterrupt:
                 print("Forcing shutdown.")
                 return True, True
+            
+    def pause(self):
+        raise NotImplementedError("whoops")
+    
+    def resume(self):
+        raise NotImplementedError("whoops")
