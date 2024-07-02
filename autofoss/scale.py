@@ -5,6 +5,7 @@ import re
 import string
 import threading
 import traceback
+from component import AutofossComponent, ComponentManager
 
 def remove_all(s, chars):
     for c in chars:
@@ -38,8 +39,8 @@ def decode_ascii_with_extra(data: bytes) -> str:
         data = data.replace(char, extra_charmap[char])
     return data.decode("ascii", errors="ignore")
 
-class AutofossScale:
-    def __init__(self, others: dict, interactive=True, log_scale=False, default_port="COM7", weight_timeout=8, full_weight=18.0):
+class AutofossScale(AutofossComponent):
+    def __init__(self, manager: ComponentManager, interactive=True, log_scale=False, default_port="COM7", weight_timeout=8, full_weight=18.0):
         print("Available ports:")
         for port in list_ports.comports():
             print("\t" + port.device)
@@ -59,7 +60,7 @@ class AutofossScale:
         self.log = log_scale
         self.pattern = re.compile(r'\d{1,3}\.\d{2}(?:lb|l)') # compile once, better performance - why wasn't I doing this before??
         self.weight_timeout = weight_timeout
-        self.others = others
+        self.manager = manager
         self.full_weight = full_weight
 
     def read_scale(self, no_log=False) -> float:
@@ -86,7 +87,7 @@ class AutofossScale:
     def thread(self):
         while self.thread_running:
             try:
-                if self.others['gator'].auto_end and datetime.datetime.now().timestamp() - self.last_weight_change > self.weight_timeout:
+                if self.manager.get('gator').auto_end and datetime.datetime.now().timestamp() - self.last_weight_change > self.weight_timeout:
                         print(f"Tank seems to be drained - no weight changes in {datetime.datetime.now().timestamp() - self.last_weight_change} seconds, over threshold of {self.weight_timeout} seconds. Stopping...")
                         self.thread_running = False
                         self.thread_initialized = False

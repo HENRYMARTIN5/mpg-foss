@@ -3,7 +3,7 @@ from gator_api.gator_data import GatorData
 import logging
 from logging.handlers import RotatingFileHandler
 import datetime
-from component import AutofossComponent
+from component import AutofossComponent, ComponentManager
 
 def to_nm(sample):
     return sample/100000 # HACK: terrible conversion method but it works
@@ -24,7 +24,7 @@ def convert_sample(sample, current_weight, elapsed):
     }
 
 class AutofossGator(AutofossComponent):
-    def __init__(self, other: dict, auto_end=True, log_gator=False):
+    def __init__(self, manager: ComponentManager, auto_end=True, log_gator=False, nodrain=False):
         self.logger = logging.getLogger(__name__)
         log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s:%(lineno)d %(message)s')
         handler = RotatingFileHandler('photonfirst-api.log',
@@ -43,8 +43,8 @@ class AutofossGator(AutofossComponent):
             raise Exception("Plug in the Gator and **TURN IT ON** before running this script.")
         self.gator = gators[0]
         self.api.connect(self.gator)
-        self.scale = other['scale']
-        self.power = other['power']
+        self.scale = manager.get('scale')
+        self.power = manager.get('power')
         self.auto_end = auto_end
         self.log = log_gator
         self.samples = []
@@ -52,6 +52,7 @@ class AutofossGator(AutofossComponent):
         self.gator_data.register_callback(self.on_sample_received)
         self.start_time = None
         self.last_packet = None
+        self.nodrain = nodrain
 
     def elapsed(self) -> float:
         if self.start_time is None:
@@ -79,7 +80,8 @@ class AutofossGator(AutofossComponent):
         self.start_time = datetime.datetime.now()
         self.api.start_streaming(self.gator)
         self.gator_data.start_streaming()
-        self.power.on(3)
+        if not self.nodrain:
+            self.power.on(3)
     
     def stop(self):
         self.power.off([1, 3])

@@ -1,4 +1,4 @@
-from component import AutofossComponent
+from component import AutofossComponent, ComponentManager
 from msl.equipment import (
     EquipmentRecord,
     ConnectionRecord,
@@ -6,7 +6,8 @@ from msl.equipment import (
 )
 
 class AutofossPowersupply(AutofossComponent):
-    def __init__(self, other: dict, address='COM9'):
+    def __init__(self, manager: ComponentManager, address='COM9'):
+        self.manager = manager # ! unused
         self.record = EquipmentRecord(
             manufacturer='Aim-TTi',
             model='MX100TP',
@@ -17,9 +18,12 @@ class AutofossPowersupply(AutofossComponent):
             )
         )
         self.channels = [1, 2, 3]
+        self.connected = False
     
     def start(self):
-        self.tti = self.record.connect()
+        if not self.connected:
+            self.tti = self.record.connect()
+            self.connected = True
 
     def stop(self):
         """Turns off all power supply channels. You probably don't want to call this."""
@@ -27,8 +31,11 @@ class AutofossPowersupply(AutofossComponent):
         self.tti.turn_off(2)
         self.tti.turn_off(3)
         self.tti.disconnect()
+        self.connected = False
     
     def on(self, channel):
+        if not self.connected:
+            self.start()
         if type(channel) != int:
             for _channel in channel:
                 self.tti.turn_on(_channel)
@@ -36,6 +43,8 @@ class AutofossPowersupply(AutofossComponent):
         self.tti.turn_on(channel)
     
     def off(self, channel):
+        if not self.connected:
+            self.start()
         if type(channel) != int:
             for _channel in channel:
                 self.tti.turn_off(_channel)
