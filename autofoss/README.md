@@ -12,6 +12,7 @@ Make sure the scale is at factory defaults, except for:
 User -> COM1 -> Mode -> Continuous
 
 Make sure the power supply has the following settings:
+
 1. 24.0V, 2.0A, Range: 35V/3A (Static generator)
 2. 12.0V, 1.8A, Range: 35V/3A - OCP off (Pump)
 3. 12.0V, 0.830A, Range: 35V/3A - OCP off, OVP off (Valve)

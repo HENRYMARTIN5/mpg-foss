@@ -1,11 +1,9 @@
-from power import AutofossPowersupply
+from power import AutofossPowersupply, ComponentManager
 import time
 
 def test_autofoss_powersupply():
-    components = {}
-    components['power'] = AutofossPowersupply(components, address='COM9')
-    power = components['power']
+    power = AutofossPowersupply(ComponentManager(), address='COM9')
     power.start()
     power.on(3)
-    time.sleep(500)
+    time.sleep(0.5)
     power.off(3)

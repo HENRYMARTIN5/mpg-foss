@@ -1,12 +1,12 @@
-from component import AutofossComponent
+from component import AutofossComponent, ComponentManager
 import threading
 import datetime
 import time
 
 class AutofossRefiller(AutofossComponent):
-    def __init__(self, other: dict, threshold=3.65, extra=5.0):
-        self.power = other['power']
-        self.scale = other['scale']
+    def __init__(self, manager: ComponentManager, threshold=3.65, extra=5.0):
+        self.power = manager.get('power')
+        self.scale = manager.get('scale')
         self.threshold = threshold
         self.refilled = False
         self.refill_progress = 0  # % full

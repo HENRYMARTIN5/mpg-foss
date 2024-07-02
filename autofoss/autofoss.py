@@ -28,7 +28,7 @@ As this API is strictly proprietary, it cannot be included in this repository. P
 and it will be automatically installed the next time you run this script.")
         exit(1)
 
-# region API initialization
+# region API init
 import scale
 import gator
 import power
@@ -36,13 +36,14 @@ import refill
 from csv_util import write_csv
 import argparse
 import traceback
+from component import ComponentManager
 
 # region Refill
-def do_refill(components: dict):
+def do_refill(components: ComponentManager):
     print('Refilling tank...')
-    components['power'].off(3)
-    components['refill'].start()
-    res = components['refill'].wait_for_refill()
+    components.get('power').off(3)
+    components.get('refill').start()
+    res = components.get('refill').wait_for_refill()
     if not res:
         print("Refill failed! Pausing for human intervention. Press ENTER to continue.")
         input()
@@ -50,18 +51,39 @@ def do_refill(components: dict):
     try:
         print('Resetting components...')
         try:
-            components['power'].stop()
+            components.get('power').stop()
         except ValueError:
             pass
-        components['gator'].reset()
-        components['scale'].reset()
+        components.get('gator').reset()
+        components.get('scale').reset()
     except Exception as e:
         print("Error resetting components:", e)
         traceback.print_exc()
-        components['scale'].stop()
-        components['power'].stop()
+        components.get('scale').stop()
+        components.get('power').stop()
 
-# region Main docstring
+def do_nodrain(args) -> int:
+    print("Initializing components...")
+    components = ComponentManager()
+    components.add('power', \
+                    power.AutofossPowersupply(components, address=args.power_port), \
+                    priority=3)
+    components.add('scale', \
+                    scale.AutofossScale(components, log_scale=not args.no_log_scale, default_port=args.scale_port, weight_timeout=args.weight_timeout, full_weight=args.full_tank_weight), \
+                    priority=2)
+    components.add('gator', \
+                    gator.AutofossGator(components, auto_end=True, log_gator=args.log_gator, nodrain=True), \
+                    priority=1)
+    components.start_all()
+    components.get('scale').wait_for_thread()
+    print("Shutting down...")
+    components.stop_all()
+    print('Everything is off. Writing samples to CSV...')
+    file_name = write_csv(components.get('gator').samples, out_folder=args.out_dir)
+    print(f'CSV file written: {file_name}')
+    return 0
+
+# region Main 
 def main() -> int:
     """
 Make sure the scale is at factory defaults, except for:
@@ -86,18 +108,29 @@ Procedure for use:
     parser.add_argument("-f", "--refill-first", help="Immediately jump to refilling the tank at the start of the script's cycle", action="store_true")
     parser.add_argument("-r", "--refill", help="Just refill the tank and exit", action="store_true")
     parser.add_argument("-o", "--out-dir", help="Output directory for CSV files", default="drains")
+    parser.add_argument("--no-drain", help="Don't drain the tank, just take a continuous data sample", action="store_true")
     parser.add_argument("--full-tank-weight", help="Weight of the tank when full in lbs", type=float, default=15.45)
     args = parser.parse_args()
-
+    
     # region Immediate arguments
+    if args.no_drain:
+        return do_nodrain(args)
+    
     if args.refill:
-        components = {}
-        components['power'] = power.AutofossPowersupply(components, address=args.power_port)
-        components['scale'] = scale.AutofossScale(components, log_scale=not args.no_log_scale, default_port=args.scale_port, weight_timeout=args.weight_timeout, full_weight=args.full_tank_weight)
-        components['gator'] = gator.AutofossGator(components, auto_end=True, log_gator=args.log_gator)
-        components['refill'] = refill.AutofossRefiller(components, threshold=args.bucket_weight, extra=args.pump_extra_runtime)
-        components['power'].start()
-        components['scale'].start()
+        components = ComponentManager()
+        components.add('power', \
+                        power.AutofossPowersupply(components, address=args.power_port), \
+                        priority=3)
+        components.add('scale', \
+                        scale.AutofossScale(components, log_scale=not args.no_log_scale, default_port=args.scale_port, weight_timeout=args.weight_timeout, full_weight=args.full_tank_weight), \
+                        priority=2)
+        components.add('gator', \
+                        gator.AutofossGator(components, auto_end=True, log_gator=args.log_gator), \
+                        priority=1)
+        components.add('refill', \
+                        refill.AutofossRefiller(components, threshold=args.bucket_weight, extra=args.pump_extra_runtime), \
+                        priority=-1)
+        components.start('power', 'scale')
         do_refill(components)
         return 0
 
@@ -109,38 +142,44 @@ Procedure for use:
         if yn.lower() != 'y':
             return 1
 
-    # region Component initialization
+    # region Components
+    components = ComponentManager()
     ########### Place your components here! ###########
-    components = {}
-    components['power'] = power.AutofossPowersupply(components, address=args.power_port) # NOTE: no start() or stop() methods
-    components['scale'] = scale.AutofossScale(components, log_scale=not args.no_log_scale, default_port=args.scale_port, weight_timeout=args.weight_timeout)
-    components['gator'] = gator.AutofossGator(components, auto_end=True, log_gator=args.log_gator)
-    components['refill'] = refill.AutofossRefiller(components, threshold=args.bucket_weight, extra=args.pump_extra_runtime)
+    components.add('power', \
+                    power.AutofossPowersupply(components, address=args.power_port), \
+                    priority=3)
+    components.add('scale', \
+                    scale.AutofossScale(components, log_scale=not args.no_log_scale, default_port=args.scale_port, weight_timeout=args.weight_timeout, full_weight=args.full_tank_weight), \
+                    priority=2)
+    components.add('gator', \
+                    gator.AutofossGator(components, auto_end=True, log_gator=args.log_gator), \
+                    priority=1)
+    components.add('refill', \
+                    refill.AutofossRefiller(components, threshold=args.bucket_weight, extra=args.pump_extra_runtime), \
+                    priority=-1)
 
     # region Main loop
     running = True
     force_shutdown = False
     jump_refill = args.refill_first
     while running:
-        components['power'].start()
+        components.start('power')
 
         if jump_refill:
             do_refill(components)
             jump_refill = False
             continue
 
-        components['gator'].start()
-        components['scale'].start()
+        components.start('gator', 'scale')
 
-        stop_next, force_shutdown = components['scale'].wait_for_thread()
+        stop_next, force_shutdown = components.get('scale').wait_for_thread()
 
         print("Shutting down...")
-        components['gator'].stop()
-        components['scale'].stop()
+        components.stop('gator', 'scale')
         if force_shutdown:
-            components['power'].stop()        
+            components.stop('power')     
         print('Everything is off. Writing samples to CSV...')
-        file_name = write_csv(components['gator'].samples, out_folder=args.out_dir)
+        file_name = write_csv(components.get('gator').samples, out_folder=args.out_dir)
         print(f'CSV file written: {file_name}')
         if force_shutdown:
             return 128 # SIGINT
