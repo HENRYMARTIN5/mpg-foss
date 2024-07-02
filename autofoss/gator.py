@@ -90,3 +90,11 @@ class AutofossGator(AutofossComponent):
     
     def reset(self):
         self.samples = []
+
+    def pause(self):
+        self.api.stop_streaming(self.gator)
+        self.gator_data.stop_streaming()
+    
+    def resume(self):
+        self.api.start_streaming(self.gator)
+        self.gator_data.start_streaming()

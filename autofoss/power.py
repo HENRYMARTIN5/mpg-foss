@@ -53,3 +53,12 @@ class AutofossPowersupply(AutofossComponent):
     
     def reset(self):
         self.stop()
+        
+    def pause(self):
+        self.powerstate = self.tti.get_output_state()
+        self.tti.turn_off(1)
+        self.tti.turn_off(2)
+        self.tti.turn_off(3)
+        
+    def resume(self):
+        raise NotImplementedError("This method is not implemented for the power supply.")
