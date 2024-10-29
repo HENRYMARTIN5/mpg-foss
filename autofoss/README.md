@@ -23,10 +23,8 @@ Zero/tare the scale before beginning.
 
 AutoFOSS collects data in a similar manner to that created by the official Gator Operator Software, with a few changes. Here's the CSV format:
 
-Timestamp: The time the data was collected
-Elapsed: The time since the start of the script
-Current Weight: The weight of the resevoir/bucket at the time of data collection
-Sensor 1-8: The wavelength values of the sensors (in nanometers) at the time of data collection
+| Timestamp         | Elapsed Time | Current Weight | Sensor 1 (nm) | Sensor 2 (nm) | Sensor 3 (nm) | Sensor 4 (nm) | Sensor 5 (nm) | Sensor 6 (nm) | Sensor 7 (nm) | Sensor 8 (nm) |
+|-------------------|--------------|----------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|
 
 You can view the data in your favorite spreadsheet program, or use the included `autofossviz.py` to open an interactive window to view the data. You can also add a custom visualizer for your data by adding your own class that inherits from plotters.plotter.Plotter and adding it to the `ALL_PLOTTERS` dict in `plotters/__init__.py` - see `weight_over_time.py` for an example.
 
